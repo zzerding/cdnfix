@@ -22,11 +22,9 @@ func query() error {
 var queryCmd = &cobra.Command{
 	Use:   "query",
 	Short: "query cdn refresh status fro task cache file",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Run: func(cmd *cobra.Command, args []string) {
 		if err := query(); err != nil {
 			log.Error().Msgf("command query error %s", err.Error())
-			return err
 		}
-		return nil
 	},
 }

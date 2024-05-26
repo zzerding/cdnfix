@@ -74,7 +74,7 @@ func queryRefreshHistory(client *cdn.Client, taskId string) (allTasksCompleted b
 		return true
 	}
 	for _, detail := range response.Response.PurgeLogs {
-		log.Debug().Msgf("task: %s, status: %s", *detail.TaskId, *detail.Status)
+		log.Info().Msgf("url: %s, status: %s", *detail.Url, *detail.Status)
 		if *detail.Status == "process" {
 			return false
 		}
@@ -96,7 +96,7 @@ func (c *TencentCloudClient) waitQueryStatusForTaskCompletion(taskId string) {
 			}
 			return // 任务完成，退出循环
 		}
-		time.Sleep(5 * time.Second) // 每次轮询间隔5秒
+		time.Sleep(10 * time.Second) // 每次轮询间隔5秒
 	}
 }
 
@@ -107,12 +107,12 @@ func (c *TencentCloudClient) QueryRefreshHistoryForTasks() {
 		return
 	}
 	if c.taskCacheFile == "" {
-		log.Error().Msgf("QueryRefreshHistoryForTasks called with invalid arguments: taskCacheFile is empty")
+		log.Info().Msgf("QueryRefreshHistoryForTasks called with invalid arguments: taskCacheFile is empty")
 		return
 	}
 	tasks, err := readCacheFile(c.taskCacheFile)
 	if err != nil || len(tasks) == 0 {
-		log.Error().Msgf("failed to read cache file: %v,len tasks: %d", c.taskCacheFile, len(tasks))
+		log.Info().Msgf("failed to read cache file: %v,len tasks: %d", c.taskCacheFile, len(tasks))
 		return
 	}
 	var wg sync.WaitGroup

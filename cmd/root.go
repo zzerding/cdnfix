@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/zzerding/refresh-cdn/logger"
 )
 
 var rootCmd = &cobra.Command{
@@ -17,19 +17,17 @@ var rootCmd = &cobra.Command{
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		log.Print(err)
 		os.Exit(1)
 	}
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringP("urls", "u", "", "Comma separated URLs to refresh")
-	rootCmd.PersistentFlags().StringP("urlfile", "f", "", "Path to file containing URLs to refresh")
-	rootCmd.PersistentFlags().StringP("envfile", "e", ".env", "Path to configuration file, default .env")
-	viper.BindPFlag("urls", rootCmd.PersistentFlags().Lookup("urls"))
-	viper.BindPFlag("urlfile", rootCmd.PersistentFlags().Lookup("urlfile"))
+	rootCmd.PersistentFlags().StringP("envfile", "e", ".env", "Path to configuration file, default .env.or you can set system env SECRE_ID and SECRE_KEY")
+	rootCmd.PersistentFlags().BoolP("debug", "d", false, "Debug mode")
 	viper.BindPFlag("envfile", rootCmd.PersistentFlags().Lookup("envfile"))
-	initConfig()
+	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
+	cobra.OnInitialize(initConfig)
 }
 
 // 定义一个结构体来保存配置信息
@@ -41,6 +39,7 @@ type Config struct {
 }
 
 func initConfig() {
+	logger.InitLog()
 	// 使用 viper 读取配置文件
 	envfile := viper.GetString("envfile")
 	log.Debug().Msgf("env file path is %s", envfile)
@@ -52,7 +51,7 @@ func initConfig() {
 	viper.AutomaticEnv()
 	// 尝试读取配置文件
 	if err := viper.ReadInConfig(); err != nil {
-		log.Error().Msgf("error reading config file: %s", err.Error())
-		os.Exit(1)
+		log.Info().Msgf(" reading config file: %s", err.Error())
 	}
+
 }
