@@ -5,7 +5,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"github.com/zzerding/refresh-cdn/cloud/tencent"
+	"github.com/zzerding/cdnfix/cloud/tencent"
 )
 
 func init() {

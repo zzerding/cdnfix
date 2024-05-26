@@ -1,4 +1,4 @@
-module github.com/zzerding/refresh-cdn
+module github.com/zzerding/cdnfix
 
 go 1.17
 

@@ -19,40 +19,40 @@ export SECRET_KEY=xxxxxx
 ```
 
 ### use source run commad
-1. `git clone https://github.com/zzerding/refresh-cdn.git`
-2. cd refresh-cdn
+1. `git clone https://github.com/zzerding/cdnfix.git`
+2. cd cdnfix
 3. go run main.go
 ### use binary run commad
-1. go install  github.com/zzerding/refresh-cdn
-2. refresh-cdn 
+1. go install  github.com/zzerding/cdnfix
+2. cdnfix 
 ### use docker run commad
-1. docker run -rm -v $PWD:/app -e SECRET_ID=xxx -e SECRET_KEY=xxx zzerding/cnd 
-2. docker run --rm --env-file=.env -v $(PWD)/.task_push.cache:/root/.task_push.cache -v $(PWD)/.task_refresh.cache:/root/.task_refresh.cache zzerding/cdn -u https://www.xxxx.com/join/ push
-3. docker run --rm  --env-file=.env  -v $(PWD)/.task_push.cache:/root/.task_push.cache -v $(PWD)/.task_refresh.cache:/root/.task_refresh.cache zzerding/cdn  query
+1. docker run -rm -v $PWD:/app -e SECRET_ID=xxx -e SECRET_KEY=xxx zzerding/refresh-cnd 
+2. docker run --rm --env-file=.env -v $(PWD)/.task_push.cache:/root/.task_push.cache -v $(PWD)/.task_refresh.cache:/root/.task_refresh.cache zzerding/cdnfix -u https://www.xxxx.com/join/ push
+3. docker run --rm  --env-file=.env  -v $(PWD)/.task_push.cache:/root/.task_push.cache -v $(PWD)/.task_refresh.cache:/root/.task_refresh.cache zzerding/cdnfix  query
 
 ## example
 #### set .env or set enviroment variables
 
 * refresh cdn cache by url 
   
-  `refresh-cdn -u https://www.xxxx.com refresh`
+  `cdnfix -u https://www.xxxx.com refresh`
 
 * refresh cdn cache by dir
-  `refresh-cdn -u https://www.xxxx.com/ refresh`
+  `cdnfix -u https://www.xxxx.com/ refresh`
 
 * query refresh status
-  `refresh-cdn query`
+  `cdnfix query`
 
 * refresh cdn cache by url file
   ```
   echo https://www.xxx.com/s?wd=tencent > /tmp/test.txt
   echo https://www.xxxx.com/ > /tmp/test.html
-  refresh-cdn -f /tmp/test.txt refresh
+  cdnfix -f /tmp/test.txt refresh
   ```
 
 * use othev env file 
-  `refresh-cdn -e /tmp/.env.shanghai -f /tmp/urlList.txt refresh`
+  `cdnfix -e /tmp/.env.shanghai -f /tmp/urlList.txt refresh`
 
 * use debug mode
-  `refresh-cdn -d query`
+  `cdnfix -d query`
 

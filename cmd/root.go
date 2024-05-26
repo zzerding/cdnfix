@@ -6,7 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/zzerding/refresh-cdn/logger"
+	"github.com/zzerding/cdnfix/logger"
 )
 
 var rootCmd = &cobra.Command{

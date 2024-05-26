@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/zzerding/refresh-cdn/cmd"
+	"github.com/zzerding/cdnfix/cmd"
 )
 
 func main() {
