@@ -10,8 +10,8 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "refresh-cdn",
-	Short: "refresh cdn of tencentcloud",
+	Use:   "",
+	Short: "refresh  and push cache of tencentcloud cdn",
 	Long:  `This is a CDN management application that allows you to query refresh history.`,
 }
 
@@ -25,6 +25,11 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringP("envfile", "e", ".env", "Path to configuration file, default .env.or you can set system env SECRE_ID and SECRE_KEY")
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "Debug mode")
+	rootCmd.PersistentFlags().StringP("urls", "u", "", "urls ")
+	rootCmd.PersistentFlags().StringP("urlfile", "f", "", "urls file ,this file on line on one url")
+
+	viper.BindPFlag("urls", rootCmd.PersistentFlags().Lookup("urls"))
+	viper.BindPFlag("urlfile", rootCmd.PersistentFlags().Lookup("urlfile"))
 	viper.BindPFlag("envfile", rootCmd.PersistentFlags().Lookup("envfile"))
 	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
 	cobra.OnInitialize(initConfig)

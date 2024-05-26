@@ -2,3 +2,4 @@
 .tasks.cache
 dist
 *.txt
+*.cache

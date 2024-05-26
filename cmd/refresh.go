@@ -12,7 +12,7 @@ import (
 	"github.com/zzerding/refresh-cdn/cloud/tencent"
 )
 
-var refreshCmd = &cobra.Command{
+var refreshCacheCmd = &cobra.Command{
 	Use:   "refresh cdn",
 	Short: "refresh cdn",
 	Long:  "refresh cnd for tencent use -f or -u input url list",
@@ -20,11 +20,9 @@ var refreshCmd = &cobra.Command{
 }
 
 func init() {
-	refreshCmd.Flags().StringP("urls", "u", "", "urls ")
-	refreshCmd.Flags().StringP("urlfile", "f", "", "urls file ,this file on line on one url")
-	viper.BindPFlag("urls", refreshCmd.Flags().Lookup("urls"))
-	viper.BindPFlag("urlfile", refreshCmd.Flags().Lookup("urlfile"))
-	rootCmd.AddCommand(refreshCmd)
+	refreshCacheCmd.Flags().StringP("cachefile", "c", ".task_refresh.cache", "push cache task file")
+	viper.BindPFlag("refresh_task_cache_file", refreshCacheCmd.Flags().Lookup("cachefile"))
+	rootCmd.AddCommand(refreshCacheCmd)
 }
 
 // 读取 URL 列表
@@ -87,6 +85,6 @@ func refresh() error {
 }
 func refreshCommand(cmd *cobra.Command, args []string) {
 	if err := refresh(); err != nil {
-		log.Error().Msgf(" %s!!!use -v env file or set system env", err.Error())
+		log.Error().Msgf(" %s", err.Error())
 	}
 }

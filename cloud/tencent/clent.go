@@ -37,5 +37,7 @@ func CreateCDNClient() (*TencentCloudClient, error) {
 		return nil, fmt.Errorf("failed to create CDN client: %w", err)
 	}
 	tencentCloudClient.client = client
+	tencentCloudClient.RefreshCacheFile = viper.GetString("refresh_task_cache_file")
+	tencentCloudClient.PushTackCacheFile = viper.GetString("push_task_cache_file")
 	return &tencentCloudClient, nil
 }

@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"sync"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/zzerding/refresh-cdn/cloud/tencent"
@@ -15,7 +17,11 @@ func query() error {
 	if c, err = tencent.CreateCDNClient(); err != nil {
 		return err
 	}
-	c.QueryRefreshHistoryForTasks()
+	var wg sync.WaitGroup
+	c.QueryRefreshHistoryForTasks(c.PushTackCacheFile, tencent.REFRESH, &wg)
+	c.QueryRefreshHistoryForTasks(c.RefreshCacheFile, tencent.PUSHCACHE, &wg)
+	defer log.Printf("task query complete")
+	wg.Wait() // Wait for all goroutines to complete
 	return nil
 }
 

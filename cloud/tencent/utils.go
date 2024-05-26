@@ -61,7 +61,10 @@ func readCacheFile(cacheFile string) ([]string, error) {
 func updateCacheFile(cacheFile string, taskID string, completed bool) error {
 	file, err := os.OpenFile(cacheFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to open cache file: %w", err)
+		//create file
+		if file, err = os.Create(cacheFile); err != nil {
+			return fmt.Errorf("failed to create cache file: %w path:%s", err, cacheFile)
+		}
 	}
 	defer file.Close()
 

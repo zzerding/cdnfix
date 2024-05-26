@@ -1,10 +1,13 @@
 package tencent
 
-import cdn "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/cdn/v20180606"
+import (
+	cdn "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/cdn/v20180606"
+)
 
 type TencentCloudClient struct {
-	client        *cdn.Client // CDN 客户端
-	taskCacheFile string      // 任务缓存文件
+	client            *cdn.Client // CDN client
+	RefreshCacheFile  string      // refresh cache file
+	PushTackCacheFile string      // push cache file
 }
 
 type Config struct {
@@ -15,9 +18,21 @@ type Config struct {
 }
 
 var tencentCloudClient TencentCloudClient
-var taskCacheFile string = ".tasks.cache"
 
-func init() {
-	tencentCloudClient.client = nil
-	tencentCloudClient.taskCacheFile = taskCacheFile
+type TaskType uint16
+
+const (
+	PUSHCACHE TaskType = iota
+	REFRESH
+)
+
+func (s TaskType) String() string {
+	switch s {
+	case PUSHCACHE:
+		return "push"
+	case REFRESH:
+		return "refresh"
+	default:
+		return "unknown"
+	}
 }
