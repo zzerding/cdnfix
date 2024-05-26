@@ -12,7 +12,7 @@ import (
 func InitLog() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	log.Logger = log.With().Logger()
-	log.Logger = log.Logger.Level(zerolog.ErrorLevel)
+	log.Logger = log.Logger.Level(zerolog.InfoLevel)
 	if viper.GetBool("debug") {
 		SetLogLevel("debug")
 		fmt.Println("debug mod enbale")

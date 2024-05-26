@@ -80,7 +80,7 @@ func refresh() error {
 	if err := client.RefreshPaths(pathsToPurge); err != nil {
 		return err
 	}
-	log.Print("urls is push to cloud cdn")
+	log.Info().Msg("urls is push to cloud cdn")
 	return nil
 }
 func refreshCommand(cmd *cobra.Command, args []string) {

@@ -38,7 +38,7 @@ func pushCache() error {
 	if err := client.PushUrlsCache(urlList); err != nil {
 		return err
 	}
-	log.Print("push cache tasks .urls is push to cloud cdn")
+	log.Info().Msg("push cache tasks urls is push to cloud cdn")
 	return nil
 }
 func pushCacheFunc(cmd *cobra.Command, args []string) {
