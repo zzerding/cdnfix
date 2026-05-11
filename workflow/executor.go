@@ -15,7 +15,7 @@ import (
 
 func ReadURLs(urls string, filePath string) ([]string, error) {
 	var urlList []string
-	
+
 	// Read from stdin if available
 	stat, _ := os.Stdin.Stat()
 	if (stat.Mode() & os.ModeCharDevice) == 0 {
@@ -58,7 +58,7 @@ func ReadURLs(urls string, filePath string) ([]string, error) {
 	if len(urlList) == 0 {
 		return nil, fmt.Errorf("either --urls, --file, or stdin must be provided")
 	}
-	
+
 	return urlList, nil
 }
 
@@ -185,7 +185,7 @@ func SubmitAndRecord(paths Paths, config tencent.Config, action string, sourceFi
 				refreshURLs = append(refreshURLs, target)
 			}
 		}
-		
+
 		recordTask := func(taskID string, count int) error {
 			if taskID == "" {
 				return nil
@@ -212,7 +212,7 @@ func SubmitAndRecord(paths Paths, config tencent.Config, action string, sourceFi
 				return finalize("failed", err)
 			}
 		}
-		
+
 		if len(refreshPaths) > 0 {
 			pathTaskID, err := client.RefreshPaths(refreshPaths)
 			if err != nil {
@@ -229,12 +229,15 @@ func SubmitAndRecord(paths Paths, config tencent.Config, action string, sourceFi
 	return finalize("submitted", nil)
 }
 
-func ExecuteBatch(paths Paths, manifestPath string) error {
+func ExecuteBatch(paths Paths, manifestPath string, opts ExecuteBatchOptions) error {
 	jobs, err := ReadJobs(manifestPath)
 	if err != nil {
 		return err
 	}
-	jobs = SortedJobs(jobs)
+	jobs, err = SelectBatchJobs(jobs, opts)
+	if err != nil {
+		return err
+	}
 	for _, job := range jobs {
 		urls, err := ReadURLs("", job.File)
 		if err != nil {

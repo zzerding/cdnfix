@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -57,10 +58,29 @@ Use --root only for portable deployments. It acts as a shortcut for:
 }
 
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		log.Print(err)
-		os.Exit(1)
+	if code := execute(os.Args[1:], os.Stdout, os.Stderr); code != 0 {
+		os.Exit(code)
 	}
+}
+
+func execute(args []string, stdout io.Writer, stderr io.Writer) int {
+	if wantsVersion(args) {
+		_, _ = fmt.Fprintln(stdout, Version())
+		return 0
+	}
+
+	rootCmd.SetOut(stdout)
+	rootCmd.SetErr(stderr)
+	rootCmd.SetArgs(args)
+	if err := rootCmd.Execute(); err != nil {
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
+	}
+	return 0
+}
+
+func wantsVersion(args []string) bool {
+	return len(args) == 1 && (args[0] == "-v" || args[0] == "--version")
 }
 
 func init() {
@@ -74,6 +94,7 @@ func init() {
 	rootCmd.PersistentFlags().StringP("urls", "u", "", "Comma-separated URLs")
 	rootCmd.PersistentFlags().StringP("urlfile", "f", "", "Path to URL file, one URL per line; relative paths are resolved from the current working directory, or from <root> in portable mode")
 	rootCmd.PersistentFlags().String("log-dir", "", "Directory for run logs; defaults to /var/log/cdnfix or <root>/var/log in portable mode")
+	rootCmd.Flags().BoolP("version", "v", false, "Print version and exit")
 
 	_ = viper.BindPFlag("root_dir", rootCmd.PersistentFlags().Lookup("root"))
 	_ = viper.BindPFlag("config_dir", rootCmd.PersistentFlags().Lookup("config-dir"))

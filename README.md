@@ -7,6 +7,7 @@ Tencent Cloud CDN refresh and push tool with explicit `site` and `job` managemen
 Get command help:
 
 ```bash
+cdnfix -v
 cdnfix --help
 cdnfix init --help
 cdnfix refresh --help
@@ -55,6 +56,7 @@ Typical commands:
 ```bash
 cdnfix init
 cdnfix batch
+cdnfix batch --job prod-a-refresh
 cdnfix --site prod-a -f /etc/cdnfix/urls/prod-a/refresh.txt refresh
 cdnfix --site prod-a -u https://example.com/a.js push
 cdnfix query

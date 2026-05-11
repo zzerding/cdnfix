@@ -14,8 +14,10 @@ RUN go mod download
 # Copy all files in the current directory to the /app directory in the container
 COPY . /app
 
+ARG VERSION=dev
+
 # Build the binary
-RUN CGO_ENABLED=0  go build -ldflags "-s -w" -o /app/cdn main.go
+RUN CGO_ENABLED=0 go build -ldflags "-s -w -X github.com/zzerding/cdnfix/cmd.version=${VERSION}" -o /app/cdn main.go
 
 # Install certificates (e.g., using `ca-certificates` package on Debian/Ubuntu-based images)
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates 

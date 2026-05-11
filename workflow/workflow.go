@@ -46,6 +46,10 @@ type Job struct {
 	File   string `mapstructure:"file"`
 }
 
+type ExecuteBatchOptions struct {
+	JobName string
+}
+
 type TaskRecord struct {
 	ID            string `json:"id"`
 	Action        string `json:"action"`
@@ -299,6 +303,29 @@ func SortedJobs(jobs []Job) []Job {
 		return out[i].Site < out[j].Site
 	})
 	return out
+}
+
+func SelectBatchJobs(jobs []Job, opts ExecuteBatchOptions) ([]Job, error) {
+	jobName := strings.TrimSpace(opts.JobName)
+	if jobName == "" {
+		return SortedJobs(jobs), nil
+	}
+
+	var matches []Job
+	for _, job := range jobs {
+		if job.Name == jobName {
+			matches = append(matches, job)
+		}
+	}
+
+	switch len(matches) {
+	case 0:
+		return nil, fmt.Errorf("job %q not found in manifest", jobName)
+	case 1:
+		return SortedJobs(matches), nil
+	default:
+		return nil, fmt.Errorf("job %q is ambiguous: %d matching jobs in manifest", jobName, len(matches))
+	}
 }
 
 func sanitizeName(value string) string {

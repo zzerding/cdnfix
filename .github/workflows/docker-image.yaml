@@ -48,6 +48,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
+          build-args: |
+            VERSION=${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'dev' }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

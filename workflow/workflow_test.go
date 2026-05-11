@@ -72,6 +72,71 @@ func TestReadJobs(t *testing.T) {
 	}
 }
 
+func TestSelectBatchJobsWithoutFilterReturnsSortedJobs(t *testing.T) {
+	jobs := []Job{
+		{Name: "z-job", Site: "prod-b", Action: "push"},
+		{Name: "b-job", Site: "prod-a", Action: "refresh"},
+		{Name: "a-job", Site: "prod-a", Action: "push"},
+	}
+
+	selected, err := SelectBatchJobs(jobs, ExecuteBatchOptions{})
+	if err != nil {
+		t.Fatalf("SelectBatchJobs failed: %v", err)
+	}
+
+	if len(selected) != 3 {
+		t.Fatalf("unexpected selected job count: %d", len(selected))
+	}
+	if selected[0].Name != "a-job" || selected[1].Name != "b-job" || selected[2].Name != "z-job" {
+		t.Fatalf("jobs not sorted as expected: %+v", selected)
+	}
+}
+
+func TestSelectBatchJobsWithExactMatch(t *testing.T) {
+	jobs := []Job{
+		{Name: "prod-a-refresh", Site: "prod-a", Action: "refresh"},
+		{Name: "prod-b-push", Site: "prod-b", Action: "push"},
+	}
+
+	selected, err := SelectBatchJobs(jobs, ExecuteBatchOptions{JobName: "prod-b-push"})
+	if err != nil {
+		t.Fatalf("SelectBatchJobs failed: %v", err)
+	}
+
+	if len(selected) != 1 || selected[0].Name != "prod-b-push" {
+		t.Fatalf("unexpected selected jobs: %+v", selected)
+	}
+}
+
+func TestSelectBatchJobsReturnsErrorWhenMissing(t *testing.T) {
+	jobs := []Job{
+		{Name: "prod-a-refresh", Site: "prod-a", Action: "refresh"},
+	}
+
+	_, err := SelectBatchJobs(jobs, ExecuteBatchOptions{JobName: "missing-job"})
+	if err == nil {
+		t.Fatal("expected error for missing job")
+	}
+	if err.Error() != `job "missing-job" not found in manifest` {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSelectBatchJobsReturnsErrorWhenAmbiguous(t *testing.T) {
+	jobs := []Job{
+		{Name: "shared-job", Site: "prod-a", Action: "refresh"},
+		{Name: "shared-job", Site: "prod-b", Action: "push"},
+	}
+
+	_, err := SelectBatchJobs(jobs, ExecuteBatchOptions{JobName: "shared-job"})
+	if err == nil {
+		t.Fatal("expected error for ambiguous job")
+	}
+	if err.Error() != `job "shared-job" is ambiguous: 2 matching jobs in manifest` {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestResolveLayoutUsesSystemDefaultsWithoutRoot(t *testing.T) {
 	t.Setenv("CDNFIX_ROOT", "")
 	t.Setenv("CDNFIX_CONFIG_DIR", "")
