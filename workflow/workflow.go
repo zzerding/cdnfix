@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/viper"
@@ -232,7 +233,12 @@ func SaveTaskState(path string, state *TaskState) error {
 	return writeJSON(path, state)
 }
 
+var stateMutex sync.Mutex
+
 func AddTask(path string, site string, action string, task TaskRecord) error {
+	stateMutex.Lock()
+	defer stateMutex.Unlock()
+
 	state, err := LoadTaskState(path, site, action)
 	if err != nil {
 		return err
@@ -248,6 +254,9 @@ func AddTask(path string, site string, action string, task TaskRecord) error {
 }
 
 func MarkTask(path string, site string, action string, taskID string, status string, checkedAt time.Time) error {
+	stateMutex.Lock()
+	defer stateMutex.Unlock()
+
 	state, err := LoadTaskState(path, site, action)
 	if err != nil {
 		return err
