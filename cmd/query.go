@@ -13,7 +13,7 @@ func init() {
 
 func query() error {
 	siteFilter := selectedSite()
-	runLogger, err := logger.NewRunLogger(commandLogPath("query", siteFilter))
+	runLogger, err := logger.NewRunLogger("")
 	if err != nil {
 		return err
 	}

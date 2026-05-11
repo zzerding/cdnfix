@@ -129,7 +129,7 @@ func SubmitAndRecord(paths Paths, config tencent.Config, action string, sourceFi
 	}()
 	runLog := runLogger.Logger()
 
-	if err := SaveRun(run); err != nil {
+	if err := AppendRun(run); err != nil {
 		return err
 	}
 
@@ -139,7 +139,7 @@ func SubmitAndRecord(paths Paths, config tencent.Config, action string, sourceFi
 		if runErr != nil {
 			run.Error = runErr.Error()
 		}
-		if err := SaveRun(run); err != nil && runErr == nil {
+		if err := AppendRun(run); err != nil && runErr == nil {
 			return err
 		}
 		return runErr

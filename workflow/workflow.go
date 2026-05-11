@@ -78,7 +78,7 @@ type RunRecord struct {
 	SourceFile   string   `json:"source_file,omitempty"`
 	LogFile      string   `json:"log_file"`
 	CacheFile    string   `json:"cache_file"`
-	RunFile      string   `json:"run_file"`
+	RunJournal   string   `json:"run_journal"`
 	SubmittedIDs []string `json:"submitted_ids"`
 	StartedAt    string   `json:"started_at"`
 	FinishedAt   string   `json:"finished_at,omitempty"`
@@ -187,7 +187,7 @@ func NewRun(paths Paths, site string, action string, jobName string, sourceFile 
 	dateDir := now.Format("2006-01-02")
 	cacheFile := TaskStatePath(paths, site, action)
 	logFile := filepath.Join(paths.LogDir, dateDir, runID+".log")
-	runFile := filepath.Join(paths.RunDir, dateDir, runID+".json")
+	runJournal := filepath.Join(paths.RunDir, now.Format("2006-01")+".jsonl")
 	return RunRecord{
 		ID:         runID,
 		Site:       site,
@@ -196,7 +196,7 @@ func NewRun(paths Paths, site string, action string, jobName string, sourceFile 
 		SourceFile: sourceFile,
 		LogFile:    logFile,
 		CacheFile:  cacheFile,
-		RunFile:    runFile,
+		RunJournal: runJournal,
 		StartedAt:  now.Format(time.RFC3339),
 		Status:     "running",
 	}
@@ -206,9 +206,24 @@ func TaskStatePath(paths Paths, site string, action string) string {
 	return filepath.Join(paths.CacheDir, sanitizeName(site), fmt.Sprintf("%s.tasks.json", normalizeAction(action)))
 }
 
-func SaveRun(run RunRecord) error {
+func AppendRun(run RunRecord) error {
 	run.FinishedAt = strings.TrimSpace(run.FinishedAt)
-	return writeJSON(run.RunFile, run)
+	data, err := json.Marshal(run)
+	if err != nil {
+		return fmt.Errorf("failed to marshal run record: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(run.RunJournal), 0755); err != nil {
+		return fmt.Errorf("failed to create directory for %s: %w", run.RunJournal, err)
+	}
+	file, err := os.OpenFile(run.RunJournal, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open %s: %w", run.RunJournal, err)
+	}
+	defer file.Close()
+	if _, err := file.Write(append(data, '\n')); err != nil {
+		return fmt.Errorf("failed to write %s: %w", run.RunJournal, err)
+	}
+	return nil
 }
 
 func LoadTaskState(path string, site string, action string) (*TaskState, error) {

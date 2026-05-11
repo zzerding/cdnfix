@@ -51,6 +51,14 @@ Runtime output:
 - run metadata: `/var/lib/cdnfix/runs`
 - logs: `/var/log/cdnfix`
 
+Runtime behavior notes:
+
+- `query` no longer writes a dedicated file log by default. It now emits its runtime log/output to `stderr`, which fits `systemd` and `journald` directly.
+- run records are no longer stored as one JSON file per execution. `cdnfix` now appends records into monthly JSONL files under `runs/`, for example `/var/lib/cdnfix/runs/2026-05.jsonl`.
+- Recommended retention split:
+  - use `logrotate` for `/var/log/cdnfix/*/*.log`
+  - use `systemd-tmpfiles` for `/var/lib/cdnfix/runs/*.jsonl`
+
 Typical commands:
 
 ```bash
@@ -63,6 +71,8 @@ printf '%s\n' https://example.com/a.js | cdnfix --site prod-a push
 cdnfix query
 cdnfix --site prod-a query
 ```
+
+When running under `systemd`, keep `stdout`/`stderr` attached to the service manager unless you explicitly want file logs. That lets `query` output land in `journald` without any extra wrapper.
 
 ## URL Input Methods
 
@@ -219,6 +229,38 @@ With `--root /opt/cdnfix`, the portable layout is:
 - task cache: `/opt/cdnfix/var/lib/cache`
 - run metadata: `/opt/cdnfix/var/lib/runs`
 - logs: `/opt/cdnfix/var/log`
+
+`runs/` uses the same monthly JSONL append format in portable mode, for example `/opt/cdnfix/var/lib/runs/2026-05.jsonl`.
+
+## Operations
+
+### Logs and Run Retention
+
+Recommended system installation:
+
+- application log files under `/var/log/cdnfix/*/*.log` are rotated by `logrotate`
+- monthly run ledgers under `/var/lib/cdnfix/runs/*.jsonl` are expired by `systemd-tmpfiles`
+- `query` output is read from `stderr` / `journald`, not from a dedicated query log file
+
+Install the sample policies from this repository:
+
+```bash
+install -Dm0644 deploy/logrotate/cdnfix /etc/logrotate.d/cdnfix
+install -Dm0644 deploy/tmpfiles/cdnfix.conf /etc/tmpfiles.d/cdnfix.conf
+systemd-tmpfiles --create /etc/tmpfiles.d/cdnfix.conf
+```
+
+Review the retention window before enabling it in production. The shipped examples keep rotated log files for a limited period and remove old monthly `runs/*.jsonl` files after 90 days.
+
+Common checks:
+
+```bash
+journalctl -u cdnfix.service -e
+ls -lh /var/log/cdnfix/
+ls -lh /var/lib/cdnfix/runs/
+systemd-tmpfiles --clean /etc/tmpfiles.d/cdnfix.conf
+logrotate -d /etc/logrotate.d/cdnfix
+```
 
 ## Development
 

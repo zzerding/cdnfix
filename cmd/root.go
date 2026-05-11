@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -173,17 +172,6 @@ func runtimePaths() workflow.Paths {
 		CacheDir: viper.GetString("cache_dir"),
 		RunDir:   viper.GetString("run_dir"),
 	}
-}
-
-func commandLogPath(command string, site string) string {
-	now := time.Now()
-	dateDir := now.Format("2006-01-02")
-	name := strings.TrimSpace(site)
-	if name == "" {
-		name = "all-sites"
-	}
-	file := fmt.Sprintf("%s.%s.%s.log", name, command, now.Format("20060102T150405"))
-	return filepath.Join(viper.GetString("log_dir"), dateDir, file)
 }
 
 func selectedSite() string {

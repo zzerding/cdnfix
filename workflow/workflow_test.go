@@ -1,8 +1,11 @@
 package workflow
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -255,5 +258,75 @@ func TestResolveLayoutPrefersExplicitOptionsThenEnvThenRoot(t *testing.T) {
 	}
 	if layout.Manifest != filepath.Join(root, "cli-config", "jobs.yaml") {
 		t.Fatalf("unexpected manifest: %q", layout.Manifest)
+	}
+}
+
+func TestNewRunUsesMonthlyJournalPath(t *testing.T) {
+	paths := Paths{
+		LogDir:   "/var/log/cdnfix",
+		CacheDir: "/var/lib/cdnfix/cache",
+		RunDir:   "/var/lib/cdnfix/runs",
+	}
+	now := time.Date(2026, time.May, 11, 9, 30, 0, 0, time.UTC)
+
+	run := NewRun(paths, "prod-a", "refresh", "prod-a-refresh", "/tmp/urls.txt", now)
+
+	if run.RunJournal != "/var/lib/cdnfix/runs/2026-05.jsonl" {
+		t.Fatalf("unexpected run journal path: %q", run.RunJournal)
+	}
+	if run.LogFile != "/var/log/cdnfix/2026-05-11/prod-a.refresh.prod-a-refresh."+strconv.FormatInt(now.UnixNano(), 10)+".log" {
+		t.Fatalf("unexpected log file path: %q", run.LogFile)
+	}
+}
+
+func TestAppendRunAppendsJSONLines(t *testing.T) {
+	root := t.TempDir()
+	runJournal := filepath.Join(root, "runs", "2026-05.jsonl")
+	run := RunRecord{
+		ID:         "run-1",
+		Site:       "prod-a",
+		Action:     "push",
+		LogFile:    filepath.Join(root, "logs", "run-1.log"),
+		CacheFile:  filepath.Join(root, "cache", "prod-a", "push.tasks.json"),
+		RunJournal: runJournal,
+		StartedAt:  "2026-05-11T10:00:00Z",
+		Status:     "running",
+	}
+
+	if err := AppendRun(run); err != nil {
+		t.Fatalf("AppendRun() first call failed: %v", err)
+	}
+	run.Status = "submitted"
+	run.FinishedAt = "2026-05-11T10:00:01Z"
+	if err := AppendRun(run); err != nil {
+		t.Fatalf("AppendRun() second call failed: %v", err)
+	}
+
+	content, err := os.ReadFile(runJournal)
+	if err != nil {
+		t.Fatalf("ReadFile() failed: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(content)), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 json lines, got %d: %q", len(lines), string(content))
+	}
+
+	var first RunRecord
+	if err := json.Unmarshal([]byte(lines[0]), &first); err != nil {
+		t.Fatalf("failed to unmarshal first line: %v", err)
+	}
+	if first.Status != "running" {
+		t.Fatalf("unexpected first status: %q", first.Status)
+	}
+
+	var second RunRecord
+	if err := json.Unmarshal([]byte(lines[1]), &second); err != nil {
+		t.Fatalf("failed to unmarshal second line: %v", err)
+	}
+	if second.Status != "submitted" {
+		t.Fatalf("unexpected second status: %q", second.Status)
+	}
+	if second.FinishedAt != "2026-05-11T10:00:01Z" {
+		t.Fatalf("unexpected second finished_at: %q", second.FinishedAt)
 	}
 }
