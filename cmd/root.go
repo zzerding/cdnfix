@@ -16,8 +16,25 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "cdnfix",
-	Short: "refresh and push cache of tencent cloud cdn",
-	Long:  `This is a CDN management application that allows you to query refresh history.`,
+	Short: "Manage Tencent Cloud CDN refresh and push jobs",
+	Long: `cdnfix manages Tencent Cloud CDN refresh and push operations with an
+explicit site/job model.
+
+By default, all paths are resolved from the application root, which is the
+directory containing the cdnfix executable. The default layout is:
+
+  <root>/config/sites.yaml
+  <root>/config/jobs.yaml
+  <root>/var/logs
+  <root>/var/cache
+  <root>/var/runs
+
+Use --root when the binary is not deployed inside the application root.`,
+	Example: `  cdnfix --root /opt/cdnfix batch
+  cdnfix --site prod-a -f urls/prod-a/refresh.txt refresh
+  cdnfix --site prod-a -u https://example.com/a.js push
+  cdnfix query
+  cdnfix --site prod-a query`,
 }
 
 func Execute() {

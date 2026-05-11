@@ -9,8 +9,15 @@ import (
 var refreshCacheCmd = &cobra.Command{
 	Use:   "refresh",
 	Short: "refresh cdn cache for one site",
-	Long:  "refresh cdn cache for one site by --site and --urls/--file",
-	Run:   refreshCommand,
+	Long: `Refresh CDN cache for a single site.
+
+Use --site to choose a configured site. Provide URLs with --urls or load them
+from a file with --urlfile. URLs ending with "/" are submitted as path refresh
+requests; all other URLs are submitted as URL refresh requests.`,
+	Example: `  cdnfix --site prod-a -u https://example.com/a.js refresh
+  cdnfix --site prod-a -f urls/prod-a/refresh.txt refresh
+  cdnfix --root /opt/cdnfix --site prod-a -f urls/prod-a/refresh.txt refresh`,
+	Run: refreshCommand,
 }
 
 func init() {

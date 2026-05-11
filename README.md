@@ -2,6 +2,27 @@
 
 Tencent Cloud CDN refresh and push tool with explicit `site` and `job` management.
 
+## Quick Start
+
+Get command help:
+
+```bash
+cdnfix --help
+cdnfix refresh --help
+cdnfix push --help
+cdnfix batch --help
+cdnfix query --help
+```
+
+Typical commands:
+
+```bash
+cdnfix --root /opt/cdnfix batch
+cdnfix --root /opt/cdnfix --site prod-a -f urls/prod-a/refresh.txt refresh
+cdnfix --root /opt/cdnfix --site prod-a -u https://example.com/a.js push
+cdnfix --root /opt/cdnfix query
+```
+
 ## Model
 
 Configuration is anchored to a single application root. By default, the root is the directory that contains the `cdnfix` executable, so config and runtime files do not depend on the current working directory.
@@ -137,6 +158,16 @@ Override the root explicitly when needed:
 
 ```bash
 cdnfix --root /opt/cdnfix batch
+```
+
+Command help is also available from the CLI:
+
+```bash
+cdnfix --help
+cdnfix refresh --help
+cdnfix push --help
+cdnfix batch --help
+cdnfix query --help
 ```
 
 ## Runtime Files

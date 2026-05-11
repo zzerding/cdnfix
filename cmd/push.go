@@ -9,8 +9,14 @@ import (
 var pushCacheCmd = &cobra.Command{
 	Use:   "push",
 	Short: "push cache for one site",
-	Long:  "push cache for one site by --site and --urls/--file",
-	Run:   pushCacheFunc,
+	Long: `Push cache for a single site.
+
+Use --site to choose a configured site. Provide URLs with --urls or load them
+from a file with --urlfile.`,
+	Example: `  cdnfix --site prod-a -u https://example.com/a.js push
+  cdnfix --site prod-a -f urls/prod-a/push.txt push
+  cdnfix --root /opt/cdnfix --site prod-a -f urls/prod-a/push.txt push`,
+	Run: pushCacheFunc,
 }
 
 func init() {
