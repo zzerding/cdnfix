@@ -15,14 +15,16 @@ var refreshCacheCmd = &cobra.Command{
 	Long: `Refresh CDN cache for a single site.
 
 Use --site to choose a configured site. Provide URLs with --urls or load them
-from a file with --urlfile. URLs ending with "/" are submitted as path refresh
-requests; all other URLs are submitted as URL refresh requests.
+from a file with --urlfile. You can also pipe URLs from stdin, one URL per
+line. URLs ending with "/" are submitted as path refresh requests; all other
+URLs are submitted as URL refresh requests.
 
 By default, cdnfix reads site configuration from /etc/cdnfix/sites.yaml and
 writes runtime state under /var/lib/cdnfix and /var/log/cdnfix. Use --root for
 a portable deployment where config/, urls/, and var/ live under one directory.`,
 	Example: `  cdnfix --site prod-a -u https://example.com/a.js refresh
   cdnfix --site prod-a -f /etc/cdnfix/urls/prod-a/refresh.txt refresh
+  printf '%s\n' https://example.com/a.js https://example.com/static/ | cdnfix --site prod-a refresh
   cdnfix --config-dir /etc/cdnfix --site prod-a -f /srv/cdnfix/urls/prod-a/refresh.txt refresh
   cdnfix --root /opt/cdnfix --site prod-a -f urls/prod-a/refresh.txt refresh`,
 	Run: refreshCommand,
@@ -40,12 +42,12 @@ func refresh() error {
 	if len(urlList) == 0 {
 		return fmt.Errorf("no URLs provided for refresh")
 	}
-	
+
 	config, err := workflow.ResolveSiteConfig(selectedSite())
 	if err != nil {
 		return err
 	}
-	
+
 	return workflow.SubmitAndRecord(runtimePaths(), config, "refresh", viper.GetString("urlfile"), urlList, "")
 }
 

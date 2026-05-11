@@ -54,6 +54,7 @@ Use --root only for portable deployments. It acts as a shortcut for:
   cdnfix --config-dir /etc/cdnfix --state-dir /var/lib/cdnfix --log-dir /var/log/cdnfix query
   cdnfix --site prod-a -u https://example.com/a.js push
   cdnfix --site prod-a -f /etc/cdnfix/urls/prod-a/refresh.txt refresh
+  printf '%s\n' https://example.com/a.js | cdnfix --site prod-a push
   cdnfix --root /opt/cdnfix batch`,
 }
 
@@ -91,8 +92,8 @@ func init() {
 	rootCmd.PersistentFlags().StringP("site", "s", "", "Site name from configuration")
 	rootCmd.PersistentFlags().StringP("manifest", "m", "", "Path to jobs manifest file; defaults to <config-dir>/jobs.yaml")
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "Debug mode")
-	rootCmd.PersistentFlags().StringP("urls", "u", "", "Comma-separated URLs")
-	rootCmd.PersistentFlags().StringP("urlfile", "f", "", "Path to URL file, one URL per line; relative paths are resolved from the current working directory, or from <root> in portable mode")
+	rootCmd.PersistentFlags().StringP("urls", "u", "", "Comma-separated URLs; ignored when stdin is piped in")
+	rootCmd.PersistentFlags().StringP("urlfile", "f", "", "Path to URL file, one URL per line; relative paths are resolved from the current working directory, or from <root> in portable mode; ignored when stdin is piped in")
 	rootCmd.PersistentFlags().String("log-dir", "", "Directory for run logs; defaults to /var/log/cdnfix or <root>/var/log in portable mode")
 	rootCmd.Flags().BoolP("version", "v", false, "Print version and exit")
 

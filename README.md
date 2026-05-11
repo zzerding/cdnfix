@@ -59,8 +59,33 @@ cdnfix batch
 cdnfix batch --job prod-a-refresh
 cdnfix --site prod-a -f /etc/cdnfix/urls/prod-a/refresh.txt refresh
 cdnfix --site prod-a -u https://example.com/a.js push
+printf '%s\n' https://example.com/a.js | cdnfix --site prod-a push
 cdnfix query
 cdnfix --site prod-a query
+```
+
+## URL Input Methods
+
+`refresh` and `push` support three URL input methods:
+
+1. `--urls` / `-u`: comma-separated URLs
+2. `--urlfile` / `-f`: one URL per line from a file
+3. `stdin`: one URL per line from a shell pipeline
+
+When stdin is piped in, `cdnfix` reads from stdin first.
+
+Examples:
+
+```bash
+# Comma-separated URLs
+cdnfix --site prod-a -u https://example.com/a.js,https://example.com/b.css push
+
+# Read from file
+cdnfix --site prod-a -f /etc/cdnfix/urls/prod-a/refresh.txt refresh
+
+# Read from stdin
+printf '%s\n' https://example.com/a.js https://example.com/b.css | cdnfix --site prod-a push
+cat /etc/cdnfix/urls/prod-a/refresh.txt | cdnfix --site prod-a refresh
 ```
 
 Initialize a fresh layout:
