@@ -14,10 +14,6 @@ RUN go mod download
 # Copy all files in the current directory to the /app directory in the container
 COPY . /app
 
-# Compile source code
-RUN --mount=type=cache,target=/go/pkg/mod \
-go mod download 
-
 # Build the binary
 RUN CGO_ENABLED=0  go build -ldflags "-s -w" -o /app/cdn main.go
 
