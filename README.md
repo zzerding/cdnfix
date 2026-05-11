@@ -8,6 +8,7 @@ Get command help:
 
 ```bash
 cdnfix --help
+cdnfix init --help
 cdnfix refresh --help
 cdnfix push --help
 cdnfix batch --help
@@ -52,11 +53,20 @@ Runtime output:
 Typical commands:
 
 ```bash
+cdnfix init
 cdnfix batch
 cdnfix --site prod-a -f /etc/cdnfix/urls/prod-a/refresh.txt refresh
 cdnfix --site prod-a -u https://example.com/a.js push
 cdnfix query
 cdnfix --site prod-a query
+```
+
+Initialize a fresh layout:
+
+```bash
+cdnfix init
+cdnfix --root /opt/cdnfix init
+cdnfix --root /opt/cdnfix --site-name prod-a init
 ```
 
 ## Path Precedence

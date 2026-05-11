@@ -49,6 +49,7 @@ Use --root only for portable deployments. It acts as a shortcut for:
   <root>/var/lib
   <root>/var/log`,
 	Example: `  cdnfix batch
+  cdnfix init
   cdnfix --config-dir /etc/cdnfix --state-dir /var/lib/cdnfix --log-dir /var/log/cdnfix query
   cdnfix --site prod-a -u https://example.com/a.js push
   cdnfix --site prod-a -f /etc/cdnfix/urls/prod-a/refresh.txt refresh
