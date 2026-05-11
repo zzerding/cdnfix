@@ -8,10 +8,10 @@ import (
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common"
 )
 
-func (c *TencentCloudClient) PushUrlsCache(urls []string) error {
+func (c *TencentCloudClient) PushUrlsCache(urls []string) (string, error) {
 	if len(urls) == 0 {
 		log.Info().Msgf("no urls to refresh %v", urls)
-		return nil
+		return "", nil
 	}
 
 	request := cdn.NewPushUrlsCacheRequest()
@@ -19,38 +19,30 @@ func (c *TencentCloudClient) PushUrlsCache(urls []string) error {
 	request.UrlEncode = common.BoolPtr(true)
 	response, err := c.client.PushUrlsCache(request)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if response == nil || response.Response == nil || response.Response.TaskId == nil {
-		return fmt.Errorf("failed to refresh URLs: invalid response")
+		return "", fmt.Errorf("failed to refresh URLs: invalid response")
 	}
-
-	taskId := *response.Response.TaskId
-	if err := updateCacheFile(c.PushTackCacheFile, taskId, false); err != nil {
-		return fmt.Errorf("failed to update cache file: %w", err)
-	}
-	return nil
+	return *response.Response.TaskId, nil
 }
 
-// query push cache task status
-func queryPushCachehHistory(client *cdn.Client, taskId string) bool {
+func (c *TencentCloudClient) QueryPushTaskCompleted(taskID string) (bool, error) {
 	request := cdn.NewDescribePushTasksRequest()
-	request.TaskId = &taskId
-	response, err := client.DescribePushTasks(request)
+	request.TaskId = &taskID
+	response, err := c.client.DescribePushTasks(request)
 	if err != nil {
-		log.Error().Msgf("failed to query refresh history: %v", err)
-		return true
+		return false, fmt.Errorf("failed to query push history: %w", err)
 	}
 	if response == nil {
-		log.Error().Msgf("empty response from DescribePurgeTasks")
-		return true
+		return false, fmt.Errorf("empty response from DescribePushTasks")
 	}
 	for _, detail := range response.Response.PushLogs {
-		log.Info().Msgf("query push cache task.url: %s, status: %s", *detail.Url, *detail.Status)
+		log.Info().Msgf("query push cache task url: %s, status: %s", *detail.Url, *detail.Status)
 		if *detail.Status == "process" {
-			return false
+			return false, nil
 		}
 	}
-	return true
+	return true, nil
 }

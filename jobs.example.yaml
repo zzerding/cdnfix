@@ -1,0 +1,10 @@
+jobs:
+  - name: prod-a-refresh
+    site: prod-a
+    action: refresh
+    file: ./urls/prod-a/refresh.txt
+
+  - name: prod-b-push
+    site: prod-b
+    action: push
+    file: ./urls/prod-b/push.txt

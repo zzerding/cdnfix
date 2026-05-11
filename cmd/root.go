@@ -1,17 +1,22 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/zzerding/cdnfix/logger"
+	"github.com/zzerding/cdnfix/workflow"
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "",
-	Short: "refresh  and push cache of tencentcloud cdn",
+	Use:   "cdnfix",
+	Short: "refresh and push cache of tencent cloud cdn",
 	Long:  `This is a CDN management application that allows you to query refresh history.`,
 }
 
@@ -23,40 +28,62 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringP("envfile", "e", ".env", "Path to configuration file, default .env.or you can set system env SECRE_ID and SECRE_KEY")
+	rootCmd.PersistentFlags().StringP("envfile", "e", ".env", "Path to site configuration file")
+	rootCmd.PersistentFlags().StringP("site", "s", "", "Site name from configuration")
+	rootCmd.PersistentFlags().StringP("manifest", "m", "", "Path to jobs manifest file")
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "Debug mode")
-	rootCmd.PersistentFlags().StringP("urls", "u", "", "urls ")
-	rootCmd.PersistentFlags().StringP("urlfile", "f", "", "urls file ,this file on line on one url")
+	rootCmd.PersistentFlags().StringP("urls", "u", "", "Comma-separated URLs")
+	rootCmd.PersistentFlags().StringP("urlfile", "f", "", "Path to URL file, one URL per line")
+	rootCmd.PersistentFlags().String("log-dir", "./var/logs", "Directory for run logs")
+	rootCmd.PersistentFlags().String("cache-dir", "./var/cache", "Directory for task cache files")
+	rootCmd.PersistentFlags().String("run-dir", "./var/runs", "Directory for run metadata")
 
-	viper.BindPFlag("urls", rootCmd.PersistentFlags().Lookup("urls"))
-	viper.BindPFlag("urlfile", rootCmd.PersistentFlags().Lookup("urlfile"))
-	viper.BindPFlag("envfile", rootCmd.PersistentFlags().Lookup("envfile"))
-	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
+	_ = viper.BindPFlag("urls", rootCmd.PersistentFlags().Lookup("urls"))
+	_ = viper.BindPFlag("urlfile", rootCmd.PersistentFlags().Lookup("urlfile"))
+	_ = viper.BindPFlag("envfile", rootCmd.PersistentFlags().Lookup("envfile"))
+	_ = viper.BindPFlag("site", rootCmd.PersistentFlags().Lookup("site"))
+	_ = viper.BindPFlag("manifest", rootCmd.PersistentFlags().Lookup("manifest"))
+	_ = viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
+	_ = viper.BindPFlag("log_dir", rootCmd.PersistentFlags().Lookup("log-dir"))
+	_ = viper.BindPFlag("cache_dir", rootCmd.PersistentFlags().Lookup("cache-dir"))
+	_ = viper.BindPFlag("run_dir", rootCmd.PersistentFlags().Lookup("run-dir"))
 	cobra.OnInitialize(initConfig)
-}
-
-// 定义一个结构体来保存配置信息
-type Config struct {
-	//fromat Secret_ID=xxx Secret_Key=xxx Region=xxx
-	SecretID  string `mapstructure:"Secret_ID"`
-	SecretKey string `mapstructure:"Secret_Key"`
-	Region    string //https://github.com/TencentCloud/tencentcloud-sdk-go/blob/master/tencentcloud/common/regions/regions.go
 }
 
 func initConfig() {
 	logger.InitLog()
-	// 使用 viper 读取配置文件
 	envfile := viper.GetString("envfile")
 	log.Debug().Msgf("env file path is %s", envfile)
 	if envfile == "" {
-		log.Info().Msgf("no configuration file specified %s", envfile)
+		return
 	}
 	viper.SetConfigFile(envfile)
-	viper.SetConfigType("env")
-	viper.AutomaticEnv()
-	// 尝试读取配置文件
-	if err := viper.ReadInConfig(); err != nil {
-		log.Info().Msgf(" reading config file: %s", err.Error())
+	if configType := strings.TrimPrefix(filepath.Ext(envfile), "."); configType != "" {
+		viper.SetConfigType(configType)
+	} else {
+		viper.SetConfigType("env")
 	}
+	viper.AutomaticEnv()
+	if err := viper.ReadInConfig(); err != nil {
+		log.Info().Msgf("reading config file: %s", err.Error())
+	}
+}
 
+func runtimePaths() workflow.Paths {
+	return workflow.Paths{
+		LogDir:   viper.GetString("log_dir"),
+		CacheDir: viper.GetString("cache_dir"),
+		RunDir:   viper.GetString("run_dir"),
+	}
+}
+
+func commandLogPath(command string, site string) string {
+	now := time.Now()
+	dateDir := now.Format("2006-01-02")
+	name := strings.TrimSpace(site)
+	if name == "" {
+		name = "all-sites"
+	}
+	file := fmt.Sprintf("%s.%s.%s.log", name, command, now.Format("20060102T150405"))
+	return filepath.Join(viper.GetString("log_dir"), dateDir, file)
 }

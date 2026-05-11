@@ -5,19 +5,15 @@ import (
 )
 
 type TencentCloudClient struct {
-	client            *cdn.Client // CDN client
-	RefreshCacheFile  string      // refresh cache file
-	PushTackCacheFile string      // push cache file
+	client *cdn.Client
 }
 
 type Config struct {
-	//fromat Secret_ID=xxx Secret_Key=xxx Region=xxx
-	SecretID  string `mapstructure:"SECRET_ID"`
-	SecretKey string `mapstructure:"SECRET_KEY"`
-	Region    string //https://github.com/TencentCloud/tencentcloud-sdk-go/blob/master/tencentcloud/common/regions/regions.go
+	Name      string `mapstructure:"-"`
+	SecretID  string `mapstructure:"secret_id"`
+	SecretKey string `mapstructure:"secret_key"`
+	Region    string `mapstructure:"region"`
 }
-
-var tencentCloudClient TencentCloudClient
 
 type TaskType uint16
 

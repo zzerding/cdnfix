@@ -1,14 +1,14 @@
 package cmd
 
 import (
+	"os"
 	"reflect"
 	"strings"
 	"testing"
 )
 
 func TestReadURLs(t *testing.T) {
-	// Test case 1: URLs provided as command line argument
-	urls := "https://example.com/page1,https://example.com/page2"
+	urls := "https://example.com/page1, https://example.com/page2"
 	filePath := ""
 	expected := []string{"https://example.com/page1", "https://example.com/page2"}
 	result, err := readURLs(urls, filePath)
@@ -19,9 +19,18 @@ func TestReadURLs(t *testing.T) {
 		t.Errorf("Expected %v, got %v", expected, result)
 	}
 
-	// Test case 2: URLs provided in file
 	urls = ""
-	filePath = "test_urls.txt"
+	tmpFile, err := os.CreateTemp(t.TempDir(), "urls-*.txt")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	if _, err := tmpFile.WriteString("https://example.com/page3\nhttps://example.com/page4\n"); err != nil {
+		t.Fatalf("failed to write temp file: %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("failed to close temp file: %v", err)
+	}
+	filePath = tmpFile.Name()
 	expected = []string{"https://example.com/page3", "https://example.com/page4"}
 	result, err = readURLs(urls, filePath)
 	if err != nil {
@@ -31,7 +40,6 @@ func TestReadURLs(t *testing.T) {
 		t.Errorf("Expected %v, got %v", expected, result)
 	}
 
-	// Test case 3: Neither URLs nor file provided
 	urls = ""
 	filePath = ""
 	result, err = readURLs(urls, filePath)

@@ -1,0 +1,10 @@
+sites:
+  prod-a:
+    secret_id: your-secret-id
+    secret_key: your-secret-key
+    region: ap-guangzhou
+
+  prod-b:
+    secret_id: your-secret-id
+    secret_key: your-secret-key
+    region: ap-shanghai
