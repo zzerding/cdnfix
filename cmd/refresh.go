@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/zzerding/cdnfix/workflow"
 )
 
 var refreshCacheCmd = &cobra.Command{
@@ -30,11 +33,20 @@ func init() {
 }
 
 func refresh() error {
-	urlList, err := readURLs(viper.GetString("urls"), viper.GetString("urlfile"))
-	if err != nil || len(urlList) == 0 {
+	urlList, err := workflow.ReadURLs(viper.GetString("urls"), viper.GetString("urlfile"))
+	if err != nil {
 		return err
 	}
-	return executeAction(selectedSite(), "refresh", viper.GetString("urlfile"), urlList, "")
+	if len(urlList) == 0 {
+		return fmt.Errorf("no URLs provided for refresh")
+	}
+	
+	config, err := workflow.ResolveSiteConfig(selectedSite())
+	if err != nil {
+		return err
+	}
+	
+	return workflow.SubmitAndRecord(runtimePaths(), config, "refresh", viper.GetString("urlfile"), urlList, "")
 }
 
 func refreshCommand(cmd *cobra.Command, args []string) {

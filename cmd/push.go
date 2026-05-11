@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/zzerding/cdnfix/workflow"
 )
 
 var pushCacheCmd = &cobra.Command{
@@ -29,11 +32,20 @@ func init() {
 }
 
 func pushCache() error {
-	urlList, err := readURLs(viper.GetString("urls"), viper.GetString("urlfile"))
-	if err != nil || len(urlList) == 0 {
+	urlList, err := workflow.ReadURLs(viper.GetString("urls"), viper.GetString("urlfile"))
+	if err != nil {
 		return err
 	}
-	return executeAction(selectedSite(), "push", viper.GetString("urlfile"), urlList, "")
+	if len(urlList) == 0 {
+		return fmt.Errorf("no URLs provided for push")
+	}
+	
+	config, err := workflow.ResolveSiteConfig(selectedSite())
+	if err != nil {
+		return err
+	}
+	
+	return workflow.SubmitAndRecord(runtimePaths(), config, "push", viper.GetString("urlfile"), urlList, "")
 }
 
 func pushCacheFunc(cmd *cobra.Command, args []string) {

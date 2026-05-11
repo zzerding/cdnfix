@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/zzerding/cdnfix/workflow"
 )
 
 var batchCmd = &cobra.Command{
@@ -40,5 +41,5 @@ func batch() error {
 	if manifest == "" {
 		return fmt.Errorf("--manifest is required")
 	}
-	return executeBatch(manifest)
+	return workflow.ExecuteBatch(runtimePaths(), manifest)
 }

@@ -3,6 +3,8 @@ package cmd
 import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"github.com/zzerding/cdnfix/logger"
+	"github.com/zzerding/cdnfix/workflow"
 )
 
 func init() {
@@ -10,7 +12,17 @@ func init() {
 }
 
 func query() error {
-	return queryTasks(selectedSite())
+	siteFilter := selectedSite()
+	runLogger, err := logger.NewRunLogger(commandLogPath("query", siteFilter))
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = runLogger.Close()
+	}()
+	runLog := runLogger.Logger()
+
+	return workflow.QueryTasks(runtimePaths(), siteFilter, runLog)
 }
 
 var queryCmd = &cobra.Command{

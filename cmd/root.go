@@ -163,3 +163,7 @@ func commandLogPath(command string, site string) string {
 	file := fmt.Sprintf("%s.%s.%s.log", name, command, now.Format("20060102T150405"))
 	return filepath.Join(viper.GetString("log_dir"), dateDir, file)
 }
+
+func selectedSite() string {
+	return strings.TrimSpace(viper.GetString("site"))
+}
