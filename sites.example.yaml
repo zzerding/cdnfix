@@ -1,3 +1,4 @@
+# Place this file at <root>/config/sites.yaml by default.
 sites:
   prod-a:
     secret_id: your-secret-id

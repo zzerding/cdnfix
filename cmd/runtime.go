@@ -5,14 +5,23 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 	"github.com/zzerding/cdnfix/cloud/tencent"
 	"github.com/zzerding/cdnfix/logger"
 	"github.com/zzerding/cdnfix/workflow"
 )
+
+type taskGroup struct {
+	client    *tencent.TencentCloudClient
+	cacheFile string
+	site      string
+	action    string
+	taskIDs   []string
+}
 
 func readURLs(urls string, filePath string) ([]string, error) {
 	var urlList []string
@@ -81,11 +90,14 @@ func executeAction(siteName string, action string, sourceFile string, urls []str
 	}
 	paths := runtimePaths()
 	run := workflow.NewRun(paths, config.Name, action, jobName, sourceFile, time.Now())
-	restore, err := logger.Configure(run.LogFile)
+	runLogger, err := logger.NewRunLogger(run.LogFile)
 	if err != nil {
 		return err
 	}
-	defer restore()
+	defer func() {
+		_ = runLogger.Close()
+	}()
+	runLog := runLogger.Logger()
 
 	if err := workflow.SaveRun(run); err != nil {
 		return err
@@ -108,7 +120,7 @@ func executeAction(siteName string, action string, sourceFile string, urls []str
 		return finalize("failed", err)
 	}
 
-	log.Info().Msgf("start %s for site=%s job=%s source=%s url_count=%d", action, config.Name, jobName, sourceFile, len(urls))
+	runLog.Info().Msgf("start %s for site=%s job=%s source=%s url_count=%d", action, config.Name, jobName, sourceFile, len(urls))
 	var taskIDs []string
 	submittedAt := time.Now()
 
@@ -184,7 +196,7 @@ func executeAction(siteName string, action string, sourceFile string, urls []str
 	}
 
 	run.SubmittedIDs = taskIDs
-	log.Info().Msgf("submitted %d task(s): %v", len(taskIDs), taskIDs)
+	runLog.Info().Msgf("submitted %d task(s): %v", len(taskIDs), taskIDs)
 	return finalize("submitted", nil)
 }
 
@@ -211,13 +223,17 @@ func queryTasks(siteFilter string) error {
 	if err != nil {
 		return err
 	}
-	restore, err := logger.Configure(commandLogPath("query", siteFilter))
+	runLogger, err := logger.NewRunLogger(commandLogPath("query", siteFilter))
 	if err != nil {
 		return err
 	}
-	defer restore()
+	defer func() {
+		_ = runLogger.Close()
+	}()
+	runLog := runLogger.Logger()
 
 	siteNames := tencent.SortedSiteNames(configs)
+	var groups []taskGroup
 	for _, siteName := range siteNames {
 		if siteFilter != "" && siteFilter != siteName {
 			continue
@@ -233,19 +249,62 @@ func queryTasks(siteFilter string) error {
 			if err != nil {
 				return err
 			}
-			for _, task := range pending {
-				if err := waitAndMarkTask(client, cacheFile, siteName, action, task.ID); err != nil {
-					return err
-				}
+			if len(pending) == 0 {
+				continue
 			}
+			group := taskGroup{
+				client:    client,
+				cacheFile: cacheFile,
+				site:      siteName,
+				action:    action,
+			}
+			for _, task := range pending {
+				group.taskIDs = append(group.taskIDs, task.ID)
+			}
+			groups = append(groups, group)
 		}
 	}
-	log.Info().Msg("task query complete")
+
+	if err := queryTaskGroups(runLog, groups); err != nil {
+		return err
+	}
+	runLog.Info().Msg("task query complete")
 	return nil
 }
 
-func waitAndMarkTask(client *tencent.TencentCloudClient, cacheFile string, site string, action string, taskID string) error {
-	log.Info().Msgf("waiting task completion site=%s action=%s task=%s", site, action, taskID)
+func queryTaskGroups(runLog *zerolog.Logger, groups []taskGroup) error {
+	if len(groups) == 0 {
+		return nil
+	}
+
+	errCh := make(chan error, len(groups))
+	var wg sync.WaitGroup
+	for _, group := range groups {
+		group := group
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for _, taskID := range group.taskIDs {
+				if err := waitAndMarkTask(runLog, group.client, group.cacheFile, group.site, group.action, taskID); err != nil {
+					errCh <- err
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func waitAndMarkTask(runLog *zerolog.Logger, client *tencent.TencentCloudClient, cacheFile string, site string, action string, taskID string) error {
+	runLog.Info().Msgf("waiting task completion site=%s action=%s task=%s", site, action, taskID)
 	for {
 		completed, err := queryTaskStatus(client, action, taskID)
 		if err != nil {
@@ -260,7 +319,7 @@ func waitAndMarkTask(client *tencent.TencentCloudClient, cacheFile string, site 
 			return err
 		}
 		if completed {
-			log.Info().Msgf("task %s completed", taskID)
+			runLog.Info().Msgf("task %s completed", taskID)
 			return nil
 		}
 		time.Sleep(10 * time.Second)

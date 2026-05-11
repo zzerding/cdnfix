@@ -18,6 +18,24 @@ type Paths struct {
 	RunDir   string
 }
 
+type LayoutOptions struct {
+	RootDir    string
+	ConfigDir  string
+	SiteConfig string
+	Manifest   string
+	LogDir     string
+	CacheDir   string
+	RunDir     string
+}
+
+type Layout struct {
+	RootDir    string
+	ConfigDir  string
+	SiteConfig string
+	Manifest   string
+	Paths      Paths
+}
+
 type Job struct {
 	Name   string `mapstructure:"name"`
 	Site   string `mapstructure:"site"`
@@ -61,6 +79,41 @@ type RunRecord struct {
 	Error        string   `json:"error,omitempty"`
 }
 
+func ResolveLayout(execPath string, opts LayoutOptions) (Layout, error) {
+	execDir, err := executableDir(execPath)
+	if err != nil {
+		return Layout{}, err
+	}
+
+	rootDir := execDir
+	if opts.RootDir != "" {
+		rootDir = ResolvePath(execDir, opts.RootDir)
+	}
+
+	configDir := filepath.Join(rootDir, "config")
+	if opts.ConfigDir != "" {
+		configDir = ResolvePath(rootDir, opts.ConfigDir)
+	}
+
+	layout := Layout{
+		RootDir:   rootDir,
+		ConfigDir: configDir,
+		SiteConfig: resolveFirstExisting(
+			ResolvePath(rootDir, opts.SiteConfig),
+			filepath.Join(configDir, "sites.yaml"),
+			filepath.Join(configDir, ".env"),
+			filepath.Join(rootDir, ".env"),
+		),
+		Manifest: resolveWithDefault(rootDir, opts.Manifest, filepath.Join(configDir, "jobs.yaml")),
+		Paths: Paths{
+			LogDir:   resolveWithDefault(rootDir, opts.LogDir, filepath.Join(rootDir, "var", "logs")),
+			CacheDir: resolveWithDefault(rootDir, opts.CacheDir, filepath.Join(rootDir, "var", "cache")),
+			RunDir:   resolveWithDefault(rootDir, opts.RunDir, filepath.Join(rootDir, "var", "runs")),
+		},
+	}
+	return layout, nil
+}
+
 func ReadJobs(path string) ([]Job, error) {
 	cfg := viper.New()
 	cfg.SetConfigFile(path)
@@ -81,12 +134,16 @@ func ReadJobs(path string) ([]Job, error) {
 		jobs[i].Name = strings.TrimSpace(jobs[i].Name)
 		jobs[i].Site = strings.TrimSpace(jobs[i].Site)
 		jobs[i].Action = normalizeAction(jobs[i].Action)
-		jobs[i].File = strings.TrimSpace(jobs[i].File)
+		jobs[i].File = ResolveJobFile(path, jobs[i].File)
 		if jobs[i].Site == "" || jobs[i].Action == "" || jobs[i].File == "" {
 			return nil, fmt.Errorf("invalid job at index %d", i)
 		}
 	}
 	return jobs, nil
+}
+
+func ResolveJobFile(manifestPath string, jobFile string) string {
+	return ResolvePath(filepath.Dir(manifestPath), strings.TrimSpace(jobFile))
 }
 
 func normalizeAction(action string) string {
@@ -110,7 +167,11 @@ func ValidateAction(action string) error {
 
 func NewRun(paths Paths, site string, action string, jobName string, sourceFile string, now time.Time) RunRecord {
 	action = normalizeAction(action)
-	runID := fmt.Sprintf("%s.%s.%s", sanitizeName(site), sanitizeName(action), now.Format("20060102T150405"))
+	namePart := sanitizeName(jobName)
+	if strings.TrimSpace(jobName) == "" {
+		namePart = "adhoc"
+	}
+	runID := fmt.Sprintf("%s.%s.%s.%d", sanitizeName(site), sanitizeName(action), namePart, now.UnixNano())
 	dateDir := now.Format("2006-01-02")
 	cacheFile := TaskStatePath(paths, site, action)
 	logFile := filepath.Join(paths.LogDir, dateDir, runID+".log")
@@ -169,6 +230,12 @@ func AddTask(path string, site string, action string, task TaskRecord) error {
 	if err != nil {
 		return err
 	}
+	for i := range state.Tasks {
+		if state.Tasks[i].ID == task.ID {
+			state.Tasks[i] = task
+			return SaveTaskState(path, state)
+		}
+	}
 	state.Tasks = append(state.Tasks, task)
 	return SaveTaskState(path, state)
 }
@@ -182,11 +249,12 @@ func MarkTask(path string, site string, action string, taskID string, status str
 		if state.Tasks[i].ID != taskID {
 			continue
 		}
+		if status == "completed" {
+			state.Tasks = append(state.Tasks[:i], state.Tasks[i+1:]...)
+			return SaveTaskState(path, state)
+		}
 		state.Tasks[i].Status = status
 		state.Tasks[i].LastCheckedAt = checkedAt.Format(time.RFC3339)
-		if status == "completed" {
-			state.Tasks[i].CompletedAt = checkedAt.Format(time.RFC3339)
-		}
 		return SaveTaskState(path, state)
 	}
 	return fmt.Errorf("task %q not found", taskID)
@@ -197,12 +265,8 @@ func PendingTasks(path string, site string, action string) ([]TaskRecord, error)
 	if err != nil {
 		return nil, err
 	}
-	var tasks []TaskRecord
-	for _, task := range state.Tasks {
-		if task.Status != "completed" {
-			tasks = append(tasks, task)
-		}
-	}
+	tasks := make([]TaskRecord, len(state.Tasks))
+	copy(tasks, state.Tasks)
 	return tasks, nil
 }
 
@@ -230,6 +294,61 @@ func sanitizeName(value string) string {
 		return "default"
 	}
 	return value
+}
+
+func ResolvePath(base string, target string) string {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return ""
+	}
+	if filepath.IsAbs(target) {
+		return filepath.Clean(target)
+	}
+	if strings.TrimSpace(base) == "" {
+		return filepath.Clean(target)
+	}
+	return filepath.Clean(filepath.Join(base, target))
+}
+
+func executableDir(execPath string) (string, error) {
+	if strings.TrimSpace(execPath) == "" {
+		return "", fmt.Errorf("executable path is empty")
+	}
+	if !filepath.IsAbs(execPath) {
+		absPath, err := filepath.Abs(execPath)
+		if err != nil {
+			return "", fmt.Errorf("resolve executable path: %w", err)
+		}
+		execPath = absPath
+	}
+	return filepath.Dir(filepath.Clean(execPath)), nil
+}
+
+func resolveWithDefault(base string, value string, fallback string) string {
+	if strings.TrimSpace(value) != "" {
+		return ResolvePath(base, value)
+	}
+	return filepath.Clean(fallback)
+}
+
+func resolveFirstExisting(override string, candidates ...string) string {
+	if override != "" {
+		return override
+	}
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		if _, err := os.Stat(candidate); err == nil {
+			return filepath.Clean(candidate)
+		}
+	}
+	for _, candidate := range candidates {
+		if candidate != "" {
+			return filepath.Clean(candidate)
+		}
+	}
+	return ""
 }
 
 func writeJSON(path string, payload interface{}) error {

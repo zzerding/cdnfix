@@ -28,16 +28,20 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringP("envfile", "e", ".env", "Path to site configuration file")
+	rootCmd.PersistentFlags().String("root", "", "Application root directory; defaults to the executable directory")
+	rootCmd.PersistentFlags().String("config-dir", "", "Configuration directory; defaults to <root>/config")
+	rootCmd.PersistentFlags().StringP("envfile", "e", "", "Path to site configuration file; defaults to <config-dir>/sites.yaml with .env fallbacks")
 	rootCmd.PersistentFlags().StringP("site", "s", "", "Site name from configuration")
-	rootCmd.PersistentFlags().StringP("manifest", "m", "", "Path to jobs manifest file")
+	rootCmd.PersistentFlags().StringP("manifest", "m", "", "Path to jobs manifest file; defaults to <config-dir>/jobs.yaml")
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "Debug mode")
 	rootCmd.PersistentFlags().StringP("urls", "u", "", "Comma-separated URLs")
-	rootCmd.PersistentFlags().StringP("urlfile", "f", "", "Path to URL file, one URL per line")
-	rootCmd.PersistentFlags().String("log-dir", "./var/logs", "Directory for run logs")
-	rootCmd.PersistentFlags().String("cache-dir", "./var/cache", "Directory for task cache files")
-	rootCmd.PersistentFlags().String("run-dir", "./var/runs", "Directory for run metadata")
+	rootCmd.PersistentFlags().StringP("urlfile", "f", "", "Path to URL file, one URL per line; relative paths are resolved from <root>")
+	rootCmd.PersistentFlags().String("log-dir", "", "Directory for run logs; defaults to <root>/var/logs")
+	rootCmd.PersistentFlags().String("cache-dir", "", "Directory for task cache files; defaults to <root>/var/cache")
+	rootCmd.PersistentFlags().String("run-dir", "", "Directory for run metadata; defaults to <root>/var/runs")
 
+	_ = viper.BindPFlag("root_dir", rootCmd.PersistentFlags().Lookup("root"))
+	_ = viper.BindPFlag("config_dir", rootCmd.PersistentFlags().Lookup("config-dir"))
 	_ = viper.BindPFlag("urls", rootCmd.PersistentFlags().Lookup("urls"))
 	_ = viper.BindPFlag("urlfile", rootCmd.PersistentFlags().Lookup("urlfile"))
 	_ = viper.BindPFlag("envfile", rootCmd.PersistentFlags().Lookup("envfile"))
@@ -52,7 +56,37 @@ func init() {
 
 func initConfig() {
 	logger.InitLog()
-	envfile := viper.GetString("envfile")
+	execPath, err := os.Executable()
+	if err != nil {
+		log.Fatal().Err(err).Msg("resolve executable path")
+	}
+	if resolvedPath, err := filepath.EvalSymlinks(execPath); err == nil {
+		execPath = resolvedPath
+	}
+	layout, err := workflow.ResolveLayout(execPath, workflow.LayoutOptions{
+		RootDir:    viper.GetString("root_dir"),
+		ConfigDir:  viper.GetString("config_dir"),
+		SiteConfig: viper.GetString("envfile"),
+		Manifest:   viper.GetString("manifest"),
+		LogDir:     viper.GetString("log_dir"),
+		CacheDir:   viper.GetString("cache_dir"),
+		RunDir:     viper.GetString("run_dir"),
+	})
+	if err != nil {
+		log.Fatal().Err(err).Msg("resolve runtime layout")
+	}
+	viper.Set("root_dir", layout.RootDir)
+	viper.Set("config_dir", layout.ConfigDir)
+	viper.Set("envfile", layout.SiteConfig)
+	viper.Set("manifest", layout.Manifest)
+	viper.Set("log_dir", layout.Paths.LogDir)
+	viper.Set("cache_dir", layout.Paths.CacheDir)
+	viper.Set("run_dir", layout.Paths.RunDir)
+	if urlFile := viper.GetString("urlfile"); strings.TrimSpace(urlFile) != "" {
+		viper.Set("urlfile", workflow.ResolvePath(layout.RootDir, urlFile))
+	}
+
+	envfile := layout.SiteConfig
 	log.Debug().Msgf("env file path is %s", envfile)
 	if envfile == "" {
 		return

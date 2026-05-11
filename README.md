@@ -4,6 +4,8 @@ Tencent Cloud CDN refresh and push tool with explicit `site` and `job` managemen
 
 ## Model
 
+Configuration is anchored to a single application root. By default, the root is the directory that contains the `cdnfix` executable, so config and runtime files do not depend on the current working directory.
+
 Configuration is split into three parts:
 
 - `sites`: credentials and region per site
@@ -29,6 +31,8 @@ var/
   cache/
   runs/
 ```
+
+If the binary is not deployed inside the root directory, pass `--root /path/to/app`.
 
 ### use source run commad
 1. `git clone https://github.com/zzerding/cdnfix.git`
@@ -87,65 +91,79 @@ jobs:
   - name: prod-a-refresh
     site: prod-a
     action: refresh
-    file: ./urls/prod-a/refresh.txt
+    file: ../urls/prod-a/refresh.txt
 
   - name: prod-b-push
     site: prod-b
     action: push
-    file: ./urls/prod-b/push.txt
+    file: ../urls/prod-b/push.txt
 ```
+
+`file` is resolved relative to `jobs.yaml`, not relative to the shell working directory.
 
 ## Commands
 
 Single site refresh:
 
 ```bash
-cdnfix -e ./config/sites.yaml --site prod-a -f ./urls/prod-a/refresh.txt refresh
+/opt/cdnfix/cdnfix --site prod-a -f urls/prod-a/refresh.txt refresh
 ```
 
 Single site push:
 
 ```bash
-cdnfix -e ./config/sites.yaml --site prod-a -u https://example.com/a.js push
+/opt/cdnfix/cdnfix --site prod-a -u https://example.com/a.js push
 ```
 
 Batch jobs:
 
 ```bash
-cdnfix -e ./config/sites.yaml -m ./config/jobs.yaml batch
+/opt/cdnfix/cdnfix batch
 ```
 
 Query pending tasks:
 
 ```bash
-cdnfix -e ./config/sites.yaml query
+/opt/cdnfix/cdnfix query
 ```
 
 Query one site only:
 
 ```bash
-cdnfix -e ./config/sites.yaml --site prod-a query
+/opt/cdnfix/cdnfix --site prod-a query
+```
+
+Override the root explicitly when needed:
+
+```bash
+cdnfix --root /opt/cdnfix batch
 ```
 
 ## Runtime Files
 
 Default runtime directories:
 
-- logs: `./var/logs`
-- task cache: `./var/cache`
-- runs: `./var/runs`
+- logs: `<root>/var/logs`
+- task cache: `<root>/var/cache`
+- runs: `<root>/var/runs`
 
 Examples:
 
-- log file: `var/logs/2026-05-11/prod-a.refresh.20260511T101530.log`
-- task cache: `var/cache/prod-a/refresh.tasks.json`
-- run record: `var/runs/2026-05-11/prod-a.refresh.20260511T101530.json`
+- log file: `/opt/cdnfix/var/logs/2026-05-11/prod-a.refresh.20260511T101530.log`
+- task cache: `/opt/cdnfix/var/cache/prod-a/refresh.tasks.json`
+- run record: `/opt/cdnfix/var/runs/2026-05-11/prod-a.refresh.20260511T101530.json`
 
 Runtime directories can be overridden with:
 
 - `--log-dir`
 - `--cache-dir`
 - `--run-dir`
+
+Configuration path defaults:
+
+- site config: `<root>/config/sites.yaml`
+- fallback single-site env: `<root>/config/.env`, then `<root>/.env`
+- jobs manifest: `<root>/config/jobs.yaml`
 
 ## Development
 
