@@ -72,19 +72,54 @@ func TestReadJobs(t *testing.T) {
 	}
 }
 
-func TestResolveLayoutDefaultsToExecutableDir(t *testing.T) {
+func TestResolveLayoutUsesSystemDefaultsWithoutRoot(t *testing.T) {
+	t.Setenv("CDNFIX_ROOT", "")
+	t.Setenv("CDNFIX_CONFIG_DIR", "")
+	t.Setenv("CDNFIX_STATE_DIR", "")
+	t.Setenv("CDNFIX_LOG_DIR", "")
+
+	execPath := filepath.Join(t.TempDir(), "bin", "cdnfix")
+	layout, err := ResolveLayout(execPath, LayoutOptions{})
+	if err != nil {
+		t.Fatalf("ResolveLayout failed: %v", err)
+	}
+
+	if layout.ConfigDir != "/etc/cdnfix" {
+		t.Fatalf("unexpected config dir: %q", layout.ConfigDir)
+	}
+	if layout.StateDir != "/var/lib/cdnfix" {
+		t.Fatalf("unexpected state dir: %q", layout.StateDir)
+	}
+	if layout.LogDir != "/var/log/cdnfix" {
+		t.Fatalf("unexpected log dir: %q", layout.LogDir)
+	}
+	if layout.CacheDir != "/var/lib/cdnfix/cache" {
+		t.Fatalf("unexpected cache dir: %q", layout.CacheDir)
+	}
+	if layout.RunDir != "/var/lib/cdnfix/runs" {
+		t.Fatalf("unexpected run dir: %q", layout.RunDir)
+	}
+	if layout.SiteConfig != "/etc/cdnfix/sites.yaml" {
+		t.Fatalf("unexpected site config: %q", layout.SiteConfig)
+	}
+	if layout.Manifest != "/etc/cdnfix/jobs.yaml" {
+		t.Fatalf("unexpected manifest path: %q", layout.Manifest)
+	}
+}
+
+func TestResolveLayoutMapsPortableRootShortcut(t *testing.T) {
 	root := t.TempDir()
-	execPath := filepath.Join(root, "cdnfix")
+	execPath := filepath.Join(root, "bin", "cdnfix")
 	configDir := filepath.Join(root, "config")
+	siteEnv := filepath.Join(configDir, ".env")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		t.Fatalf("failed to create config dir: %v", err)
 	}
-	siteConfig := filepath.Join(configDir, "sites.yaml")
-	if err := os.WriteFile(siteConfig, []byte("sites: {}\n"), 0644); err != nil {
-		t.Fatalf("failed to write sites config: %v", err)
+	if err := os.WriteFile(siteEnv, []byte("SECRET_ID=test\n"), 0644); err != nil {
+		t.Fatalf("failed to write site env: %v", err)
 	}
 
-	layout, err := ResolveLayout(execPath, LayoutOptions{})
+	layout, err := ResolveLayout(execPath, LayoutOptions{RootDir: ".."})
 	if err != nil {
 		t.Fatalf("ResolveLayout failed: %v", err)
 	}
@@ -92,63 +127,68 @@ func TestResolveLayoutDefaultsToExecutableDir(t *testing.T) {
 	if layout.RootDir != root {
 		t.Fatalf("unexpected root dir: got %q want %q", layout.RootDir, root)
 	}
-	if layout.ConfigDir != configDir {
-		t.Fatalf("unexpected config dir: got %q want %q", layout.ConfigDir, configDir)
+	if layout.ConfigDir != filepath.Join(root, "config") {
+		t.Fatalf("unexpected config dir: %q", layout.ConfigDir)
 	}
-	if layout.SiteConfig != siteConfig {
-		t.Fatalf("unexpected site config: got %q want %q", layout.SiteConfig, siteConfig)
+	if layout.StateDir != filepath.Join(root, "var", "lib") {
+		t.Fatalf("unexpected state dir: %q", layout.StateDir)
 	}
-	if layout.Manifest != filepath.Join(configDir, "jobs.yaml") {
-		t.Fatalf("unexpected manifest path: %q", layout.Manifest)
+	if layout.LogDir != filepath.Join(root, "var", "log") {
+		t.Fatalf("unexpected log dir: %q", layout.LogDir)
 	}
-	if layout.Paths.LogDir != filepath.Join(root, "var", "logs") {
-		t.Fatalf("unexpected log dir: %q", layout.Paths.LogDir)
+	if layout.CacheDir != filepath.Join(root, "var", "lib", "cache") {
+		t.Fatalf("unexpected cache dir: %q", layout.CacheDir)
 	}
-	if layout.Paths.CacheDir != filepath.Join(root, "var", "cache") {
-		t.Fatalf("unexpected cache dir: %q", layout.Paths.CacheDir)
+	if layout.RunDir != filepath.Join(root, "var", "lib", "runs") {
+		t.Fatalf("unexpected run dir: %q", layout.RunDir)
 	}
-	if layout.Paths.RunDir != filepath.Join(root, "var", "runs") {
-		t.Fatalf("unexpected run dir: %q", layout.Paths.RunDir)
+	if layout.SiteConfig != siteEnv {
+		t.Fatalf("unexpected site config fallback: %q", layout.SiteConfig)
+	}
+	if layout.Manifest != filepath.Join(root, "config", "jobs.yaml") {
+		t.Fatalf("unexpected manifest: %q", layout.Manifest)
 	}
 }
 
-func TestResolveLayoutResolvesOverridesAgainstRoot(t *testing.T) {
+func TestResolveLayoutPrefersExplicitOptionsThenEnvThenRoot(t *testing.T) {
 	root := t.TempDir()
 	execPath := filepath.Join(root, "bin", "cdnfix")
+	t.Setenv("CDNFIX_ROOT", "/env-root")
+	t.Setenv("CDNFIX_CONFIG_DIR", "env-config")
+	t.Setenv("CDNFIX_STATE_DIR", "env-state")
+	t.Setenv("CDNFIX_LOG_DIR", "env-log")
 
 	layout, err := ResolveLayout(execPath, LayoutOptions{
-		RootDir:    "..",
-		ConfigDir:  "settings",
-		SiteConfig: "sites.prod.yaml",
-		Manifest:   "jobs/prod.yaml",
-		LogDir:     "runtime/logs",
-		CacheDir:   "runtime/cache",
-		RunDir:     "runtime/runs",
+		RootDir:   "..",
+		ConfigDir: "cli-config",
+		LogDir:    "cli-log",
 	})
 	if err != nil {
 		t.Fatalf("ResolveLayout failed: %v", err)
 	}
 
-	expectedRoot := filepath.Clean(root)
-	if layout.RootDir != expectedRoot {
-		t.Fatalf("unexpected root dir: got %q want %q", layout.RootDir, expectedRoot)
+	if layout.RootDir != root {
+		t.Fatalf("unexpected root dir: got %q want %q", layout.RootDir, root)
 	}
-	if layout.ConfigDir != filepath.Join(expectedRoot, "settings") {
-		t.Fatalf("unexpected config dir: %q", layout.ConfigDir)
+	if layout.ConfigDir != filepath.Join(root, "cli-config") {
+		t.Fatalf("explicit config dir did not win: %q", layout.ConfigDir)
 	}
-	if layout.SiteConfig != filepath.Join(expectedRoot, "sites.prod.yaml") {
+	if layout.StateDir != filepath.Join(root, "env-state") {
+		t.Fatalf("env state dir did not override root shortcut: %q", layout.StateDir)
+	}
+	if layout.LogDir != filepath.Join(root, "cli-log") {
+		t.Fatalf("explicit log dir did not win: %q", layout.LogDir)
+	}
+	if layout.CacheDir != filepath.Join(root, "env-state", "cache") {
+		t.Fatalf("unexpected cache dir: %q", layout.CacheDir)
+	}
+	if layout.RunDir != filepath.Join(root, "env-state", "runs") {
+		t.Fatalf("unexpected run dir: %q", layout.RunDir)
+	}
+	if layout.SiteConfig != filepath.Join(root, "cli-config", "sites.yaml") {
 		t.Fatalf("unexpected site config: %q", layout.SiteConfig)
 	}
-	if layout.Manifest != filepath.Join(expectedRoot, "jobs", "prod.yaml") {
+	if layout.Manifest != filepath.Join(root, "cli-config", "jobs.yaml") {
 		t.Fatalf("unexpected manifest: %q", layout.Manifest)
-	}
-	if layout.Paths.LogDir != filepath.Join(expectedRoot, "runtime", "logs") {
-		t.Fatalf("unexpected log dir: %q", layout.Paths.LogDir)
-	}
-	if layout.Paths.CacheDir != filepath.Join(expectedRoot, "runtime", "cache") {
-		t.Fatalf("unexpected cache dir: %q", layout.Paths.CacheDir)
-	}
-	if layout.Paths.RunDir != filepath.Join(expectedRoot, "runtime", "runs") {
-		t.Fatalf("unexpected run dir: %q", layout.Paths.RunDir)
 	}
 }

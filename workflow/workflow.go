@@ -21,19 +21,21 @@ type Paths struct {
 type LayoutOptions struct {
 	RootDir    string
 	ConfigDir  string
+	StateDir   string
 	SiteConfig string
 	Manifest   string
 	LogDir     string
-	CacheDir   string
-	RunDir     string
 }
 
 type Layout struct {
 	RootDir    string
 	ConfigDir  string
+	StateDir   string
+	LogDir     string
+	CacheDir   string
+	RunDir     string
 	SiteConfig string
 	Manifest   string
-	Paths      Paths
 }
 
 type Job struct {
@@ -85,31 +87,36 @@ func ResolveLayout(execPath string, opts LayoutOptions) (Layout, error) {
 		return Layout{}, err
 	}
 
-	rootDir := execDir
-	if opts.RootDir != "" {
-		rootDir = ResolvePath(execDir, opts.RootDir)
+	rootDir := resolveFirstNonEmpty(opts.RootDir, os.Getenv("CDNFIX_ROOT"))
+	resolvedRoot := ""
+	if rootDir != "" {
+		resolvedRoot = ResolvePath(execDir, rootDir)
 	}
-
-	configDir := filepath.Join(rootDir, "config")
-	if opts.ConfigDir != "" {
-		configDir = ResolvePath(rootDir, opts.ConfigDir)
+	baseDir := execDir
+	if resolvedRoot != "" {
+		baseDir = resolvedRoot
 	}
+	configDir := resolveDir(baseDir, resolvedRoot, opts.ConfigDir, "CDNFIX_CONFIG_DIR", filepath.Join("config"), "/etc/cdnfix")
+	stateDir := resolveDir(baseDir, resolvedRoot, opts.StateDir, "CDNFIX_STATE_DIR", filepath.Join("var", "lib"), "/var/lib/cdnfix")
+	logDir := resolveDir(baseDir, resolvedRoot, opts.LogDir, "CDNFIX_LOG_DIR", filepath.Join("var", "log"), "/var/log/cdnfix")
+	cacheDir := filepath.Join(stateDir, "cache")
+	runDir := filepath.Join(stateDir, "runs")
+	siteConfig := resolveFirstExisting(
+		ResolvePath(configDir, opts.SiteConfig),
+		filepath.Join(configDir, "sites.yaml"),
+		filepath.Join(configDir, ".env"),
+	)
+	manifest := resolveWithDefault(configDir, opts.Manifest, filepath.Join(configDir, "jobs.yaml"))
 
 	layout := Layout{
-		RootDir:   rootDir,
-		ConfigDir: configDir,
-		SiteConfig: resolveFirstExisting(
-			ResolvePath(rootDir, opts.SiteConfig),
-			filepath.Join(configDir, "sites.yaml"),
-			filepath.Join(configDir, ".env"),
-			filepath.Join(rootDir, ".env"),
-		),
-		Manifest: resolveWithDefault(rootDir, opts.Manifest, filepath.Join(configDir, "jobs.yaml")),
-		Paths: Paths{
-			LogDir:   resolveWithDefault(rootDir, opts.LogDir, filepath.Join(rootDir, "var", "logs")),
-			CacheDir: resolveWithDefault(rootDir, opts.CacheDir, filepath.Join(rootDir, "var", "cache")),
-			RunDir:   resolveWithDefault(rootDir, opts.RunDir, filepath.Join(rootDir, "var", "runs")),
-		},
+		RootDir:    resolvedRoot,
+		ConfigDir:  configDir,
+		StateDir:   stateDir,
+		LogDir:     logDir,
+		CacheDir:   cacheDir,
+		RunDir:     runDir,
+		SiteConfig: siteConfig,
+		Manifest:   manifest,
 	}
 	return layout, nil
 }
@@ -329,6 +336,29 @@ func resolveWithDefault(base string, value string, fallback string) string {
 		return ResolvePath(base, value)
 	}
 	return filepath.Clean(fallback)
+}
+
+func resolveDir(base string, root string, explicit string, envName string, rootRelative string, systemDefault string) string {
+	if strings.TrimSpace(explicit) != "" {
+		return ResolvePath(base, explicit)
+	}
+	if value := strings.TrimSpace(os.Getenv(envName)); value != "" {
+		return ResolvePath(base, value)
+	}
+	if root != "" {
+		return filepath.Join(root, rootRelative)
+	}
+	return filepath.Clean(systemDefault)
+}
+
+func resolveFirstNonEmpty(values ...string) string {
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func resolveFirstExisting(override string, candidates ...string) string {

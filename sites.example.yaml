@@ -1,4 +1,5 @@
-# Place this file at <root>/config/sites.yaml by default.
+# General system installation example.
+# Default path: /etc/cdnfix/sites.yaml
 sites:
   prod-a:
     secret_id: your-secret-id

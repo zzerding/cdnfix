@@ -14,46 +14,73 @@ cdnfix batch --help
 cdnfix query --help
 ```
 
-Typical commands:
+## System Install Layout
 
-```bash
-cdnfix --root /opt/cdnfix batch
-cdnfix --root /opt/cdnfix --site prod-a -f urls/prod-a/refresh.txt refresh
-cdnfix --root /opt/cdnfix --site prod-a -u https://example.com/a.js push
-cdnfix --root /opt/cdnfix query
-```
-
-## Model
-
-Configuration is anchored to a single application root. By default, the root is the directory that contains the `cdnfix` executable, so config and runtime files do not depend on the current working directory.
-
-Configuration is split into three parts:
-
-- `sites`: credentials and region per site
-- `jobs`: mapping from `site` to URL file and action
-- `var/`: runtime output for logs, task cache, and run metadata
+For a general system installation, use fixed config, state, and log directories instead of relying on the current working directory.
 
 Recommended layout:
 
 ```text
-config/
+/etc/cdnfix/
   sites.yaml
   jobs.yaml
+  urls/
+    prod-a/
+      refresh.txt
+      push.txt
+    prod-b/
+      refresh.txt
 
-urls/
-  prod-a/
-    refresh.txt
-    push.txt
-  prod-b/
-    refresh.txt
-
-var/
-  logs/
+/var/lib/cdnfix/
   cache/
   runs/
+
+/var/log/cdnfix/
 ```
 
-If the binary is not deployed inside the root directory, pass `--root /path/to/app`.
+Default config files:
+
+- `/etc/cdnfix/sites.yaml`
+- `/etc/cdnfix/jobs.yaml`
+
+Runtime output:
+
+- task cache: `/var/lib/cdnfix/cache`
+- run metadata: `/var/lib/cdnfix/runs`
+- logs: `/var/log/cdnfix`
+
+Typical commands:
+
+```bash
+cdnfix batch
+cdnfix --site prod-a -f /etc/cdnfix/urls/prod-a/refresh.txt refresh
+cdnfix --site prod-a -u https://example.com/a.js push
+cdnfix query
+cdnfix --site prod-a query
+```
+
+## Path Precedence
+
+Path resolution should follow this order:
+
+1. CLI flags
+   - `--config-dir`
+   - `--state-dir`
+   - `--log-dir`
+   - `--root`
+2. Environment variables
+   - `CDNFIX_CONFIG_DIR`
+   - `CDNFIX_STATE_DIR`
+   - `CDNFIX_LOG_DIR`
+   - `CDNFIX_ROOT`
+3. Portable root shortcut
+   - `--root` or `CDNFIX_ROOT` maps to a self-contained layout under one directory
+4. System defaults
+   - config: `/etc/cdnfix`
+   - state: `/var/lib/cdnfix`
+   - logs: `/var/log/cdnfix`
+
+Use explicit CLI flags or environment variables when the installation does not follow the system defaults.
 
 ### use source run commad
 1. `git clone https://github.com/zzerding/cdnfix.git`
@@ -80,7 +107,7 @@ If the binary is not deployed inside the root directory, pass `--root /path/to/a
 
 ## Site Config
 
-`config/sites.yaml`
+System install example: `/etc/cdnfix/sites.yaml`
 
 ```yaml
 sites:
@@ -95,106 +122,66 @@ sites:
     region: ap-shanghai
 ```
 
-Single-site `.env` is still supported:
-
-```env
-SECRET_ID=your-secret-id
-SECRET_KEY=your-secret-key
-REGION=ap-guangzhou
-```
+Single-site `.env` fallback is still supported when you only need one site.
 
 ## Jobs Config
 
-`config/jobs.yaml`
+System install example: `/etc/cdnfix/jobs.yaml`
 
 ```yaml
 jobs:
   - name: prod-a-refresh
     site: prod-a
     action: refresh
-    file: ../urls/prod-a/refresh.txt
+    file: ./urls/prod-a/refresh.txt
 
   - name: prod-b-push
     site: prod-b
     action: push
-    file: ../urls/prod-b/push.txt
+    file: ./urls/prod-b/push.txt
 ```
 
-`file` is resolved relative to `jobs.yaml`, not relative to the shell working directory.
+`file` paths are resolved relative to the manifest file, not relative to the shell working directory.
 
-## Commands
+That means `file: ./urls/prod-a/refresh.txt` in `/etc/cdnfix/jobs.yaml` resolves to `/etc/cdnfix/urls/prod-a/refresh.txt`.
 
-Single site refresh:
+## Portable Deployment
 
-```bash
-/opt/cdnfix/cdnfix --site prod-a -f urls/prod-a/refresh.txt refresh
+Portable deployment is still supported. In that mode, keep everything under one directory and pass `--root` explicitly.
+
+Example layout:
+
+```text
+/opt/cdnfix/
+  cdnfix
+  config/
+    sites.yaml
+    jobs.yaml
+    urls/
+      prod-a/
+        refresh.txt
+  var/
+    lib/
+      cache/
+      runs/
+    log/
 ```
 
-Single site push:
-
-```bash
-/opt/cdnfix/cdnfix --site prod-a -u https://example.com/a.js push
-```
-
-Batch jobs:
-
-```bash
-/opt/cdnfix/cdnfix batch
-```
-
-Query pending tasks:
-
-```bash
-/opt/cdnfix/cdnfix query
-```
-
-Query one site only:
-
-```bash
-/opt/cdnfix/cdnfix --site prod-a query
-```
-
-Override the root explicitly when needed:
+Portable examples:
 
 ```bash
 cdnfix --root /opt/cdnfix batch
+cdnfix --root /opt/cdnfix --site prod-a -f /opt/cdnfix/config/urls/prod-a/refresh.txt refresh
+cdnfix --root /opt/cdnfix query
 ```
 
-Command help is also available from the CLI:
+With `--root /opt/cdnfix`, the portable layout is:
 
-```bash
-cdnfix --help
-cdnfix refresh --help
-cdnfix push --help
-cdnfix batch --help
-cdnfix query --help
-```
-
-## Runtime Files
-
-Default runtime directories:
-
-- logs: `<root>/var/logs`
-- task cache: `<root>/var/cache`
-- runs: `<root>/var/runs`
-
-Examples:
-
-- log file: `/opt/cdnfix/var/logs/2026-05-11/prod-a.refresh.20260511T101530.log`
-- task cache: `/opt/cdnfix/var/cache/prod-a/refresh.tasks.json`
-- run record: `/opt/cdnfix/var/runs/2026-05-11/prod-a.refresh.20260511T101530.json`
-
-Runtime directories can be overridden with:
-
-- `--log-dir`
-- `--cache-dir`
-- `--run-dir`
-
-Configuration path defaults:
-
-- site config: `<root>/config/sites.yaml`
-- fallback single-site env: `<root>/config/.env`, then `<root>/.env`
-- jobs manifest: `<root>/config/jobs.yaml`
+- site config: `/opt/cdnfix/config/sites.yaml`
+- jobs manifest: `/opt/cdnfix/config/jobs.yaml`
+- task cache: `/opt/cdnfix/var/lib/cache`
+- run metadata: `/opt/cdnfix/var/lib/runs`
+- logs: `/opt/cdnfix/var/log`
 
 ## Development
 

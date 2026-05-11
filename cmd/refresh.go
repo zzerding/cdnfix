@@ -13,9 +13,14 @@ var refreshCacheCmd = &cobra.Command{
 
 Use --site to choose a configured site. Provide URLs with --urls or load them
 from a file with --urlfile. URLs ending with "/" are submitted as path refresh
-requests; all other URLs are submitted as URL refresh requests.`,
+requests; all other URLs are submitted as URL refresh requests.
+
+By default, cdnfix reads site configuration from /etc/cdnfix/sites.yaml and
+writes runtime state under /var/lib/cdnfix and /var/log/cdnfix. Use --root for
+a portable deployment where config/, urls/, and var/ live under one directory.`,
 	Example: `  cdnfix --site prod-a -u https://example.com/a.js refresh
-  cdnfix --site prod-a -f urls/prod-a/refresh.txt refresh
+  cdnfix --site prod-a -f /etc/cdnfix/urls/prod-a/refresh.txt refresh
+  cdnfix --config-dir /etc/cdnfix --site prod-a -f /srv/cdnfix/urls/prod-a/refresh.txt refresh
   cdnfix --root /opt/cdnfix --site prod-a -f urls/prod-a/refresh.txt refresh`,
 	Run: refreshCommand,
 }

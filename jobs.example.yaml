@@ -1,12 +1,13 @@
-# Place this file at <root>/config/jobs.yaml by default.
+# General system installation example.
+# Default path: /etc/cdnfix/jobs.yaml
 # URL file paths are resolved relative to this manifest file.
 jobs:
   - name: prod-a-refresh
     site: prod-a
     action: refresh
-    file: ../urls/prod-a/refresh.txt
+    file: ./urls/prod-a/refresh.txt
 
   - name: prod-b-push
     site: prod-b
     action: push
-    file: ../urls/prod-b/push.txt
+    file: ./urls/prod-b/push.txt

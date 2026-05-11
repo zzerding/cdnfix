@@ -20,21 +20,39 @@ var rootCmd = &cobra.Command{
 	Long: `cdnfix manages Tencent Cloud CDN refresh and push operations with an
 explicit site/job model.
 
-By default, all paths are resolved from the application root, which is the
-directory containing the cdnfix executable. The default layout is:
+System-install defaults:
 
-  <root>/config/sites.yaml
-  <root>/config/jobs.yaml
-  <root>/var/logs
-  <root>/var/cache
-  <root>/var/runs
+  config-dir: /etc/cdnfix
+  state-dir:  /var/lib/cdnfix
+  log-dir:    /var/log/cdnfix
 
-Use --root when the binary is not deployed inside the application root.`,
-	Example: `  cdnfix --root /opt/cdnfix batch
-  cdnfix --site prod-a -f urls/prod-a/refresh.txt refresh
+Expected config files:
+
+  <config-dir>/sites.yaml
+  <config-dir>/jobs.yaml
+
+Derived runtime paths:
+
+  <state-dir>/cache
+  <state-dir>/runs
+
+Environment overrides:
+
+  CDNFIX_CONFIG_DIR
+  CDNFIX_STATE_DIR
+  CDNFIX_LOG_DIR
+  CDNFIX_ROOT
+
+Use --root only for portable deployments. It acts as a shortcut for:
+
+  <root>/config
+  <root>/var/lib
+  <root>/var/log`,
+	Example: `  cdnfix batch
+  cdnfix --config-dir /etc/cdnfix --state-dir /var/lib/cdnfix --log-dir /var/log/cdnfix query
   cdnfix --site prod-a -u https://example.com/a.js push
-  cdnfix query
-  cdnfix --site prod-a query`,
+  cdnfix --site prod-a -f /etc/cdnfix/urls/prod-a/refresh.txt refresh
+  cdnfix --root /opt/cdnfix batch`,
 }
 
 func Execute() {
@@ -45,20 +63,20 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().String("root", "", "Application root directory; defaults to the executable directory")
-	rootCmd.PersistentFlags().String("config-dir", "", "Configuration directory; defaults to <root>/config")
+	rootCmd.PersistentFlags().String("root", "", "Portable deployment shortcut; maps default config/state/log directories to <root>/config, <root>/var/lib, and <root>/var/log")
+	rootCmd.PersistentFlags().String("config-dir", "", "Configuration directory; defaults to /etc/cdnfix or <root>/config in portable mode")
+	rootCmd.PersistentFlags().String("state-dir", "", "State directory for cache and run metadata; defaults to /var/lib/cdnfix or <root>/var/lib in portable mode")
 	rootCmd.PersistentFlags().StringP("envfile", "e", "", "Path to site configuration file; defaults to <config-dir>/sites.yaml with .env fallbacks")
 	rootCmd.PersistentFlags().StringP("site", "s", "", "Site name from configuration")
 	rootCmd.PersistentFlags().StringP("manifest", "m", "", "Path to jobs manifest file; defaults to <config-dir>/jobs.yaml")
 	rootCmd.PersistentFlags().BoolP("debug", "d", false, "Debug mode")
 	rootCmd.PersistentFlags().StringP("urls", "u", "", "Comma-separated URLs")
-	rootCmd.PersistentFlags().StringP("urlfile", "f", "", "Path to URL file, one URL per line; relative paths are resolved from <root>")
-	rootCmd.PersistentFlags().String("log-dir", "", "Directory for run logs; defaults to <root>/var/logs")
-	rootCmd.PersistentFlags().String("cache-dir", "", "Directory for task cache files; defaults to <root>/var/cache")
-	rootCmd.PersistentFlags().String("run-dir", "", "Directory for run metadata; defaults to <root>/var/runs")
+	rootCmd.PersistentFlags().StringP("urlfile", "f", "", "Path to URL file, one URL per line; relative paths are resolved from the current working directory, or from <root> in portable mode")
+	rootCmd.PersistentFlags().String("log-dir", "", "Directory for run logs; defaults to /var/log/cdnfix or <root>/var/log in portable mode")
 
 	_ = viper.BindPFlag("root_dir", rootCmd.PersistentFlags().Lookup("root"))
 	_ = viper.BindPFlag("config_dir", rootCmd.PersistentFlags().Lookup("config-dir"))
+	_ = viper.BindPFlag("state_dir", rootCmd.PersistentFlags().Lookup("state-dir"))
 	_ = viper.BindPFlag("urls", rootCmd.PersistentFlags().Lookup("urls"))
 	_ = viper.BindPFlag("urlfile", rootCmd.PersistentFlags().Lookup("urlfile"))
 	_ = viper.BindPFlag("envfile", rootCmd.PersistentFlags().Lookup("envfile"))
@@ -66,8 +84,6 @@ func init() {
 	_ = viper.BindPFlag("manifest", rootCmd.PersistentFlags().Lookup("manifest"))
 	_ = viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
 	_ = viper.BindPFlag("log_dir", rootCmd.PersistentFlags().Lookup("log-dir"))
-	_ = viper.BindPFlag("cache_dir", rootCmd.PersistentFlags().Lookup("cache-dir"))
-	_ = viper.BindPFlag("run_dir", rootCmd.PersistentFlags().Lookup("run-dir"))
 	cobra.OnInitialize(initConfig)
 }
 
@@ -81,26 +97,34 @@ func initConfig() {
 		execPath = resolvedPath
 	}
 	layout, err := workflow.ResolveLayout(execPath, workflow.LayoutOptions{
-		RootDir:    viper.GetString("root_dir"),
-		ConfigDir:  viper.GetString("config_dir"),
+		RootDir:    strings.TrimSpace(viper.GetString("root_dir")),
+		ConfigDir:  strings.TrimSpace(viper.GetString("config_dir")),
+		StateDir:   strings.TrimSpace(viper.GetString("state_dir")),
 		SiteConfig: viper.GetString("envfile"),
 		Manifest:   viper.GetString("manifest"),
-		LogDir:     viper.GetString("log_dir"),
-		CacheDir:   viper.GetString("cache_dir"),
-		RunDir:     viper.GetString("run_dir"),
+		LogDir:     strings.TrimSpace(viper.GetString("log_dir")),
 	})
 	if err != nil {
 		log.Fatal().Err(err).Msg("resolve runtime layout")
 	}
 	viper.Set("root_dir", layout.RootDir)
 	viper.Set("config_dir", layout.ConfigDir)
+	viper.Set("state_dir", layout.StateDir)
 	viper.Set("envfile", layout.SiteConfig)
 	viper.Set("manifest", layout.Manifest)
-	viper.Set("log_dir", layout.Paths.LogDir)
-	viper.Set("cache_dir", layout.Paths.CacheDir)
-	viper.Set("run_dir", layout.Paths.RunDir)
+	viper.Set("log_dir", layout.LogDir)
+	viper.Set("cache_dir", layout.CacheDir)
+	viper.Set("run_dir", layout.RunDir)
 	if urlFile := viper.GetString("urlfile"); strings.TrimSpace(urlFile) != "" {
-		viper.Set("urlfile", workflow.ResolvePath(layout.RootDir, urlFile))
+		baseDir := ""
+		if layout.RootDir == "" {
+			if wd, err := os.Getwd(); err == nil {
+				baseDir = wd
+			}
+		} else {
+			baseDir = layout.RootDir
+		}
+		viper.Set("urlfile", workflow.ResolvePath(baseDir, urlFile))
 	}
 
 	envfile := layout.SiteConfig
